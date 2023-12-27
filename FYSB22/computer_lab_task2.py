@@ -11,7 +11,7 @@ N  = 100*2*xi_max    # num steps
 xi = np.linspace(xi_min, xi_max, N) # discretized x-range
 h = (xi_max - xi_min)/N     # step-size
 
-v0 = 6
+v0 = 18
 
 def V(xi):  # potential function doubble well
     return -v0*1/(np.cosh(xi + s)) - v0*1/(np.cosh(xi - s))
@@ -69,9 +69,14 @@ def bisec(desiredNodes, Tol = 10**(-8)):
 
 
 epsilon0 = bisec(0) # 0 nodes --> even parity (grst)
+print(epsilon0)
 epsilon1 = bisec(1) # 1 node --> odd parity (grst)
 epsilon2 = bisec(2) # 2 node --> even parity (1st excited state)
 epsilon3 = bisec(3) # 3 node --> odd parity (1st excited state)
+epsilon4 = bisec(4)
+epsilon5 = bisec(5)
+epsilon6 = bisec(6)
+epsilon7 = bisec(7)
 
 #---------------
 
@@ -88,13 +93,18 @@ def norm(e):    # returns normalization constant
 plt.plot(xi, norm(epsilon0)*phi(epsilon0)+epsilon0, label="even parity",color="tab:blue")
 plt.plot(xi, norm(epsilon1)*phi(epsilon1)+epsilon1, label="odd parity",color="tab:orange")
 plt.plot(xi, norm(epsilon2)*phi(epsilon2)+epsilon2,color="tab:blue")
+plt.plot(xi, norm(epsilon4)*phi(epsilon4)+epsilon4,color="tab:blue")
 plt.plot(xi, norm(epsilon3)*phi(epsilon3)+epsilon3,color="tab:orange")
+plt.plot(xi, norm(epsilon4)*phi(epsilon4)+epsilon4,color="tab:blue")
+plt.plot(xi, norm(epsilon5)*phi(epsilon5)+epsilon5,color="tab:orange")
+plt.plot(xi, norm(epsilon6)*phi(epsilon6)+epsilon6,color="tab:blue")
+plt.plot(xi, norm(epsilon7)*phi(epsilon7)+epsilon7,color="tab:orange")
 plt.plot(xi, V(xi), label=r"potential function V($\xi$)", color="black")
 plt.ylabel(r"Effective energy, $\epsilon$")
 plt.xlabel(r"Effective position, $\xi$")
 plt.tick_params(direction = "in", right = "True", top = "True")
 plt.legend()
 plt.title("Eigen-states in a double potential well")
-plt.text(8.3, -3.6, r"n = 1")
-plt.text(8.3, -0.6, r"n = 2")
+#plt.text(8.3, -3.6, r"n = 1")
+#plt.text(8.3, -0.6, r"n = 2")
 plt.show()
