@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt 
 
-plt.rcParams['text.usetex'] = True
+#plt.rcParams['text.usetex'] = True
 
 xi_max = 8
 xi_min = -xi_max

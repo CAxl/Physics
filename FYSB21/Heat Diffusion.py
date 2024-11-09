@@ -5,8 +5,8 @@ import matplotlib.animation as animation
 
 
 a = 1  # diffusivity
-#a2 = 10
-#r1 = 5
+a2 = 10
+r1 = 5
 
 y_pos = 0.5
 y_neg = -y_pos
@@ -16,19 +16,19 @@ xvals = np.linspace(-20, 20, 1000)
 #-------------
 # diffusivity as fnc of position
 
-# def diffuse(x):
-#     vec = np.array([x])
-#     r = np.linalg.norm(vec)
-#     if 0 < r < r1:
-#         return a
-#     else:
-#         return a2
+def diffuse(x):
+    vec = np.array([x])
+    r = np.linalg.norm(vec)
+    if 0 < r < r1:
+        return a
+    else:
+        return a2
 
 #-----------------------
 # 1-D heat func
 
 def u(x,t):     
-    #a = diffuse(x)
+    a = diffuse(x)
     return 1/2 * (sci.special.erf((y_pos - x)/np.sqrt(4*a*t)) - 
                   sci.special.erf((y_neg - x)/np.sqrt(4*a*t)))
 

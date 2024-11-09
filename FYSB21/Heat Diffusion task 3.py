@@ -64,7 +64,7 @@ basetemp = np.vectorize(layers)
 # heat function
 
 def u(x,y, t = 1):
-    beta = 5*10**(-19)
+    beta = 10**(-18)
     T, a = basetemp(x, y)
     if a == 0:
         return 0    # we're in space dude
@@ -107,8 +107,8 @@ def update(framenum):  # things that update for every frame
 ani = animation.FuncAnimation(fig = fig, func = update, frames = 200, interval = 10)
 
 
-#plt.show()
-writergif = animation.PillowWriter(fps = 30)
-ani.save("animation3.gif", writer = writergif)
+plt.show()
+#writergif = animation.PillowWriter(fps = 30)
+#ani.save("animation3.gif", writer = writergif)
 
 
