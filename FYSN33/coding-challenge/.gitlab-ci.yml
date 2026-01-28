@@ -1,0 +1,249 @@
+
+# Docker image with the installation of gcc, g++, python and others library.
+image: "$CI_REGISTRY_IMAGE:request"
+
+# CI script with 3 stages
+# Stage build: Must be done only once.
+# Stage basics: Testing programs in python.
+# Stage basics-extra: Disabled
+# Stage c++: Testing programs in C++.
+stages:
+  - build
+  - basics
+  - c++
+
+basics1:
+  stage: basics
+  script:
+    # Run the solver's script and capture the output
+    - output=$(python3 basics/basics1.py)
+    # Define the expected output
+    - expected_output=$'1\n2\n3\n4\n5\n6\n7\n8\n9\n10'
+    # Compare the actual output with the expected output
+    - if [[  $output == $expected_output  ]]; then true; else false; fi
+
+
+basics2:
+  stage: basics
+  script:
+    # Run the solver's script and capture the output
+    - output=$(python3 basics/basics2.py)
+    # Define the expected output
+    - expected_output=$'1\n2\nFizz\n4\nBuzz\nFizz\n7\n8\nFizz\nBuzz\n11\nFizz\n13\n14\nFizzBuzz\n16\n17\nFizz\n19\nBuzz'
+    # Compare the actual output with the expected output
+    - if [[  $output == $expected_output  ]]; then true; else false; fi
+
+
+basics3:
+  stage: basics
+  script:
+    # Run the solver's script and capture the output
+    - output=$(python3 basics/basics3.py)
+    # Define the expected output
+    - expected_output=$'3.5'
+    # Compare the actual output with the expected output
+    - if [[  $output == $expected_output  ]]; then true; else false; fi
+
+
+basics4:
+  stage: basics
+  script:
+    # Run the solver's script and capture the output
+    - cd basics/
+    - output=$(python3 basics4.py)
+    # Define the expected output
+    - expected_output=$'14'
+    # Compare the actual output with the expected output
+    - if [[  $output == $expected_output  ]]; then true; else false; fi
+
+#basics4-extra:
+#  stage: basics-extra
+#  script:
+#    # Go to directory for hidden tests and copy the solution there.
+#    - cd hidden-tests/ && cp ../basics/basics4.py .
+#    # Run the hidden test and compare with output
+#    - ./test.sh basics4.py basics4.res
+
+
+basics5:
+  stage: basics
+  script:
+    # Run the solver's script and capture the output
+    - output=$(python3 basics/basics5.py)
+    # Define the expected output
+    - expected_output=$'1852\n1856\n1860\n1864\n1868\n1872\n1876\n1880\n1884\n1888\n1892\n1896\n1904\n1908\n1912\n1916\n1920\n1924\n1928\n1932\n1936\n1940\n1944\n1948\n1952\n1956\n1960\n1964\n1968\n1972\n1976\n1980\n1984\n1988\n1992\n1996\n2000\n2004\n2008\n2012\n2016\n2020\n2024\n2028\n2032\n2036\n2040\n2044\n2048'
+    # Compare the actual output with the expected output
+    - if [[  $output == $expected_output  ]]; then true; else false; fi
+
+
+basics6:
+  stage: basics
+  script:
+    # Run the solver's script and capture the output
+    - cd basics/
+    - output=$(python3 basics6.py)
+    # Define the expected output
+    - expected_output=$'a = 1.05\nb = 1.00'
+    # Compare the actual output with the expected output
+    - if [[  $output == $expected_output  ]]; then true; else false; fi
+
+
+#basics6-extra:
+#  stage: basics-extra
+#  script:
+#    # Go to directory for hidden tests and copy the solution there.
+#    - cd hidden-tests/ && cp ../basics/basics6.py .
+#    # Run the hidden test and compare with output
+#    - ./test.sh basics6.py basics6.res
+
+
+basics7:
+  stage: basics
+  script:
+    # Run the solver's script and capture the output
+    - cd basics/
+    - output=$(python3 basics7.py)
+    # Define the expected output
+    - expected_output=$'32'
+    # Compare the actual output with the expected output
+    - if [[  $output == $expected_output  ]]; then true; else false; fi
+
+#basics7-extra:
+#  stage: basics-extra
+#  script:
+#    # Go to directory for hidden tests and copy the solution there.
+#    - cd hidden-tests/ && cp ../basics/basics7.py .
+#    # Run the hidden test and compare with output
+#    - echo 2231744 > basics7.res
+#    - ./test.sh basics7.py basics7.res
+
+# Simple test for basics8.py
+basics8:
+  stage: basics
+  script: 
+    # Run the solver's script and capture the output
+    - output=$(python3 basics/basics8.py)
+    # Define the expected output
+    - expected_output=$'1\n2\n6\n24'
+    # Compare the actual output with the expected output
+    - if [[ $output == $expected_output ]]; then true; else false; fi
+
+# Simple test for basics9.py
+basics9:
+  stage: basics
+  script:
+    # Run the solver's script and capture the output
+    - output=$(python3 basics/basics9.py airport)
+    # Define the expected output
+    - expected_output=$'@irpor!'
+    # Compare the actual output with the expected output
+    - if [[ "$output" == "$expected_output" ]]; then true; else false; fi
+
+
+# Test for basics9.py without input argument
+#basics9-extra:
+#  stage: basics-extra
+#  script:
+#    # Run the solver's script and capture the output
+#    - output=$(python3 basics/basics9.py) || true
+#    # Define the expected output
+#    - expected_output=$'Lack of arguments'
+#    # Compare the actual output with the expected output
+#    - if [[ "$output" == "$expected_output" ]]; then true; else false; fi
+
+
+# Test for basics10.py: checking the  exit code 
+# and saving the created file with artifacts
+basics10: 
+  stage: basics
+  script:
+    # Run the solver's script
+    - python3 basics/basics10.py
+    # Capture the exit code
+    - exit=$?
+    - echo "Exit code $exit"
+    # Check if the exit code is 0
+    - if [[ $exit == 0 ]]; then true; else false; fi
+  artifacts:
+    paths:
+      - report.txt
+    expire_in : 1 hour
+
+
+# Test for basics10.py: compare the created file and the expected file
+# with a shell program
+#basics10-extra:
+#  stage: basics-extra
+#  script:
+#    # Go to directory for hidden tests and copy the solution there.
+#    - cd hidden-tests/ && cp ../basics/basics10.py .
+ #   # Run the hidden test and check if report.txt exits and its contents
+ #   - ./test_file.sh report.txt basics10.res basics10.py
+
+
+# Test suite for basics11.cpp in a shell program.
+# Test with different input argument and without input argument.
+basics11:
+  stage: c++
+  script: 
+    # Go to directory for hidden tests and copy the solution there.
+    - cd hidden-tests/ && cp ../basics/basics11.cpp .
+    # Compilation of the program
+    - g++ -std=c++11 -o basics11 basics11.cpp
+   # Run the hidden test and check if report.txt exits and its contents
+    - ./test_vowel.sh basics11
+
+# Test for basics12.cpp wich needs the created file in basics10.py.
+# Use of depedencies.
+basics12:
+  stage: c++
+  dependencies:
+    - basics10
+  script: 
+    # Compilation of the program
+    - g++ -o basics/basics12 basics/basics12.cpp
+    # Run the program and capture the output
+    - output=$(./basics/basics12 report.txt)
+    - echo $output
+    # Define the expected output
+    - expected_output=$'5'
+    - echo $expected_output
+    # Compare the actual output with the expected output
+    - if [[ "$output" == "$expected_output" ]]; then true; else false; fi
+
+# Test for basics13.cpp with a python program.
+basics13:
+  stage: c++
+  script:
+    # Go to directory for hidden tests and copy the solution there
+    - cd hidden-tests/ && cp ../basics/basics13.cpp .
+    # Run the test (python program)
+    - python3 test_prime_numbers.py basics13.cpp basics13.res
+
+
+# Job that build and store in the registry a docker image.
+# This docker image is useful for the installation of gcc, g++, python.
+build-image:
+  stage: build
+  image: docker:latest
+  services:
+    - docker:dind
+  script: 
+    # Build the image from the Dockerfile
+    - docker build -t "$CI_REGISTRY_IMAGE:request" .
+    # Log in to the container registry
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+    # Push the image in the container registry
+    - docker push "$CI_REGISTRY_IMAGE:request"
+  when : manual
+
+# Test for basics15.cpp with a shell program wich simulate the 
+# user input.
+basics15 :
+  stage: c++
+  script:
+    - cd hidden-tests 
+    # Run the hidden test and store the output in a file
+    - ./test_contact.sh  > basics15.txt
+    # Compare the output and the expected output
+    - diff basics15.txt basics15.res

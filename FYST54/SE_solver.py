@@ -1,4 +1,3 @@
-
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -58,19 +57,19 @@ def V_WS(x):
 
     return const * V
 
-WS_diag = np.diag(V_WS(x))
+# WS_diag = np.diag(V_WS(x))
 
 
-H_HO = HO_diag + tridiag() + L2(x,0)
-H_WS = WS_diag + tridiag() + L2(x,0)
+# H_HO = HO_diag + tridiag() + L2(x,0)
+# H_WS = WS_diag + tridiag() + L2(x,0)
 
-eigvals, eigvecs = np.linalg.eig(H_WS)
+# eigvals, eigvecs = np.linalg.eig(H_WS)
 
-# sort eigvals and eigvecs
-sorted_i = np.argsort(eigvals)
-eigvals = eigvals[sorted_i]
-eigvecs = eigvecs[:, sorted_i]
-eigvecs = eigvecs.T
+# # sort eigvals and eigvecs
+# sorted_i = np.argsort(eigvals)
+# eigvals = eigvals[sorted_i]
+# eigvecs = eigvecs[:, sorted_i]
+# eigvecs = eigvecs.T
 
 hw = 8.6
 mc2 = 939.57
@@ -89,17 +88,17 @@ hc = 197.326
 def E_nl(n,l):
     return 8.6*(2*n + l + (3/2)) - 55
 
-# print()
-# print("Analytical energies:")
-# print("E00 = ", E_nl(0,0))
-# print("E10 = ", E_nl(1,0))
-# print("E20 = ", E_nl(2,0))
-# print("E30 = ", E_nl(3,0))
+print()
+print("Analytical energies:")
+print("E00 = ", E_nl(0,0))
+print("E10 = ", E_nl(1,0))
+print("E20 = ", E_nl(2,0))
+print("E30 = ", E_nl(3,0))
 
-# print("E10 = ", E_nl(1,0))
-# print("E01 = ", E_nl(0,1))
-# print("E11 = ", E_nl(1,1))
-# print("E12 = ", E_nl(1,2))
+print("E10 = ", E_nl(1,0))
+print("E01 = ", E_nl(0,1))
+print("E11 = ", E_nl(1,1))
+print("E12 = ", E_nl(1,2))
 
 
 
@@ -133,11 +132,60 @@ def SE_solver(V,l):
 
 for n in range(2):
     for l in range(2):
-        print(f"\E_{n}{l} = ", (hc**2)*SE_solver(V_WS(x),l)[0][n] / (2*mc2), "MeV")
-        plt.plot(x, 5*SE_solver(V_WS(x),l)[1][n] + SE_solver(V_WS(x),l)[0][n], label=f"u_{n}{l}(r)")
-plt.plot(x,V_WS(x), color="black", label="V_WS(r)")
-plt.xlabel("r [fm]")
-plt.ylabel("E [MeV]")
-plt.title("Reduced radial wavefunctions in Woods Saxon potential")
-plt.legend()
-plt.show()
+        print("cpp comparison(?)", SE_solver(V(x),l)[0][n])
+        print(f"\E_{n}{l} = ", (hc**2)*SE_solver(V(x),l)[0][n] / (2*mc2), "MeV")
+        #plt.plot(x, 5*SE_solver(V_WS(x),l)[1][n] + SE_solver(V_WS(x),l)[0][n], label=f"u_{n}{l}(r)")
+# plt.plot(x,V_WS(x), color="black", label="V_WS(r)")
+# plt.xlabel("r [fm]")
+# plt.ylabel("E [MeV]")
+# plt.title("Reduced radial wavefunctions in Woods Saxon potential")
+# plt.legend()
+# plt.show()
+
+
+
+
+
+
+
+
+class Radial_solver:
+    
+    def __init__(self, L, N):
+        self.L = L
+        self.N = N  # dimension of H
+        
+
+    @staticmethod
+    def V_WS(x):
+        """
+        Woods-Saxon potential
+        """
+        R0 = 5.8
+        a = 0.65
+        mc2 = 939.57
+        hc = 197.326
+        const = 2*mc2 / (hc**2) # 2m/hbar^2 constant infront of V(r) in radial SE
+    
+        V = -50/(1+np.exp((x-R0)/a))
+
+        return const * V
+    
+    @staticmethod
+    def V_HO(x):
+        """
+        Harmonic oscillator potential
+        """
+        E0 = -55    # MeV
+        hw = 8.6
+        mc2 = 939.57
+        hc = 197.326
+
+        const = 2*mc2 / (hc**2)
+
+        V = ( 0.5 * (mc2)*(hw**2)* x**2 / (hc**2) ) + E0
+
+        return const * V
+
+
+

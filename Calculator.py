@@ -1,41 +1,41 @@
 import numpy as np
-import matplotlib.pyplot as plt 
-from scipy.optimize import minimize
-from scipy import stats
-from uncertainties import ufloat, ufloat_fromstr
-from uncertainties.umath import *  # sin(), etc.
-from uncertainties import unumpy
-import numpy as np
-from pylab import *
-from scipy.optimize import curve_fit
-from scipy import odr
-import sys
-from mpl_toolkits.axes_grid1.inset_locator import zoomed_inset_axes
-from mpl_toolkits.axes_grid1.inset_locator import mark_inset
-from scipy import misc
-import scipy as scp
-import sympy as sym
+# import matplotlib.pyplot as plt 
+# from scipy.optimize import minimize
+# from scipy import stats
+# from uncertainties import ufloat, ufloat_fromstr
+# from uncertainties.umath import *  # sin(), etc.
+# from uncertainties import unumpy
+# import numpy as np
+# from pylab import *
+# from scipy.optimize import curve_fit
+# from scipy import odr
+# import sys
+# from mpl_toolkits.axes_grid1.inset_locator import zoomed_inset_axes
+# from mpl_toolkits.axes_grid1.inset_locator import mark_inset
+# from scipy import misc
+# import scipy as scp
+# import sympy as sym
 
-# table of constants 
-hbar = 6.62607015 * 1e-34 / (2*np.pi)
-c = 299792458
-k_B = 1.380649 * 1e-23
-epsilon_0 = ufloat_fromstr("8.8541878128(13)") * 1e-12
-m_e = 9.1093837 * 1e-31
-m_p = 1.67262192 * 1e-27
-m_n = ufloat_fromstr("1.674927351(74)") * 1e-27
-e = 1.60217663 * 1e-19
-alpha = 1/137
-u = 1.66053907*1e-27
+# # table of constants 
+# hbar = 6.62607015 * 1e-34 / (2*np.pi)
+# c = 299792458
+# k_B = 1.380649 * 1e-23
+# epsilon_0 = ufloat_fromstr("8.8541878128(13)") * 1e-12
+# m_e = 9.1093837 * 1e-31
+# m_p = 1.67262192 * 1e-27
+# m_n = ufloat_fromstr("1.674927351(74)") * 1e-27
+# e = 1.60217663 * 1e-19
+# alpha = 1/137
+# u = 1.66053907*1e-27
 
 
 
-m_trit = 3.01604928*u
-m_He = 3.016*u
-m_p = 1.00784 * u
-m_Bor = 10.0129370*u  
-m_Li = 7.01601*u  
-m_alpha = 4.002603*u
+# m_trit = 3.01604928*u
+# m_He = 3.016*u
+# m_p = 1.00784 * u
+# m_Bor = 10.0129370*u  
+# m_Li = 7.01601*u  
+# m_alpha = 4.002603*u
 
 
 # # a + A --> b + B
@@ -273,28 +273,35 @@ m_alpha = 4.002603*u
 # print(annual_effective_dose_rate_indoors*coef/annual_effective_dose_rate_indoors)
 
 
-N = 4
-L = 10
+N = 1000
+L = 100
 
 r = np.linspace(0.01, L, N)
 dr = np.abs(r[1]-r[0])
 
+print(r)
+
 print("dr = ", dr)
 
-def V(r):
-    """
-    Harmonic oscillator potential
-    """
-    E0 = -55    # MeV    
-    hw = 8.6
-    mc2 = 939.57
-    hc = 197.326
 
-    const = 2*mc2 / (hc**2) # const infront of V(r) in Radial SE
 
-    V = ( 0.5 * (mc2)*(hw**2)* r**2 / (hc**2) ) + E0
 
-    return const * V
+# def V(r):
+#     """
+#     Harmonic oscillator potential
+#     """
+#     E0 = -55    # MeV    
+#     hw = 8.6
+#     mc2 = 939.57
+#     hc = 197.326
 
-diag = np.diag(V(r))
-print(diag)
+#     const = 2*mc2 / (hc**2) # const infront of V(r) in Radial SE
+
+#     V = ( 0.5 * (mc2)*(hw**2)* r**2 / (hc**2) ) + E0
+
+#     return const * V
+
+# diag = np.diag(V(r))
+# print(diag)
+
+

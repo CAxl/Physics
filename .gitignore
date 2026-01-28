@@ -1,0 +1,21 @@
+# Visual Studio
+.vs/
+
+# Compiled files
+*.exe
+*.o
+*.out
+*.obj
+
+# Python cache
+__pycache__/
+*.pyc
+
+# LaTeX
+*.aux
+*.log
+*.toc
+
+# OS junk
+.DS_Store
+Thumbs.db

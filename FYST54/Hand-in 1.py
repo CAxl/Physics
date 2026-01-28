@@ -38,7 +38,7 @@ def B(A,Z):
 
 print("\Delta energy = ", B(91,36) + B(142,56) - B(235,92), "[MeV]")
 print("\Delta m) = ", (B(91,36) + B(142,56) - B(235,92)) / 931.5, "[u]") # m[u] = B[MeV/c^2]/931.5[MeV/c^2u]
-
+print("BE(16O) = ", B(16, 8))
 
 def mass(A,Z):
      
