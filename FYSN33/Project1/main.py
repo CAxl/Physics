@@ -1,6 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from scipy.integrate import RK45
+from scipy.integrate import solve_ivp
 
 class SPHsystem:
     def __init__(self, N, kernel, v0 = 0, e0 = 2.5):
@@ -140,6 +140,99 @@ class NavierStokes1D:
     
 
 
+# for Sod Shock and for now free function:
+# (put into Solver class eventually)
+def RHS(t, S_flat, system, NSequations):
+    """
+    RHS of the ODE:
+
+    f(y,t) = dy/dt
+
+    dy/dt is dS/dt = [\dot{x}, \dot{v}, \dot{rho}, \dot{e}]
+
+    Computes dS/dt given the current flattedned state vector
+    RHS required by scipy.solve_ivp 
+    """
+
+    # rebuild the State vector (matrix) as the (N,4) shape
+    S = S_flat.reshape(system.N, 4) 
+    system.S[:] = S # update object
+
+    # update density (summation, not continuity)
+    system.density_summation()
+
+    # compute time derivatives
+    dxdt = system.v
+    dvdt = NSequations.momentum_equation(system)
+    dedt = NSequations.energy_equation(system)
+
+    dSdt = np.column_stack((dxdt,
+                            dvdt,
+                            np.zeros(system.N), # index [2] == rho[:] not updated, recomputed
+                            dedt)) # obs order matters
+    
+    return dSdt.ravel()
+
+
+
+
+N = 50
+x = np.linspace(0,1,N)
+
+kernel = cubicSplineKernel(h=0.04)
+system = SPHsystem(N, kernel)
+
+# initialize S with x-positions
+system.S[:,0] = x
+#initialize S with v = 0
+system.S[:,1] = 0.0
+system.S[:,3] = 1.0
+
+# larger energy to the right
+system.S[x<0.5, 3] = 2.5
+
+S0 = system.S.ravel()
+
+NS = NavierStokes1D()
+
+
+t0 = 0.0
+T = 0.1
+Nt = 1000
+times = np.linspace(t0, T, Nt)
+
+sol = solve_ivp(
+    fun=lambda t,y: RHS(t,y,system,NS),
+    t_span=(t0,T), 
+    y0 = S0,
+    method="RK45",
+    t_eval=times,
+    rtol=1e-4,
+    atol=1e-7
+)
+
+print(sol.y.shape)        # should be (4*N, Nt)
+
+S_test = sol.y[:, 0].reshape(N, 4)
+print(S_test[:5])
+
+
+times = sol.t
+
+for k in range(0, len(times), 5):
+    plt.clf()
+
+    S_k = sol.y[:, k].reshape(N, 4)
+
+    x = S_k[:, 0]
+    e = S_k[:, 3]
+
+    plt.scatter(x, np.zeros(N), c=e, cmap="viridis")
+    plt.colorbar(label="energy")
+
+    plt.title(f"t = {times[k]:.4f}")
+    plt.xlabel("x")
+    plt.pause(0.1)
 
 
 
