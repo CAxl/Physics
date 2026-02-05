@@ -2,6 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import time
 import main
+from matplotlib.pyplot import imshow
 
 
 # # Broadcasting
@@ -34,31 +35,33 @@ import main
 # print(sumxy)
 
 
-
-
 # testing N particles with kernels
 
 N = 100
 kernel = main.cubicSplineKernel(h=1.0)
 sys = main.SPHsystem(N, kernel)
-sys.S[:,0] = np.linspace(-10,10,N)
+sys.S[:,0] = np.linspace(-10,10,N) # NOTE: could also initialize as sys.x == sys.S[:,0]
 
 dx, r = sys.geom()
+#print("dx matrix = ", dx)
 
 W = kernel.W(r)
-print(W)
+print("kernel W(r) = ", W)
+imshow(W)
+plt.colorbar()
+plt.show()
 
 x = sys.x
 
-for i in range(sys.N):
-    plt.plot(x, W[i,:], marker = 'o', label=f"kernel at x[{i}] = {x[i]:.1f}")
-    plt.axvline(x[i], linestyle='--', alpha = 0.5)
+# for i in range(sys.N):
+#     plt.plot(x, W[i,:], marker = 'o', label=f"kernel at x[{i}] = {x[i]:.1f}")
+#     plt.axvline(x[i], linestyle='--', alpha = 0.5)
 
-plt.xlabel("absolute position, x")
-plt.ylabel("W(|x_i-x_j|)")
-plt.legend()
-plt.title("felt interaction for particle x_j due to particle x_i")
-plt.show()
+# plt.xlabel("absolute position, x")
+# plt.ylabel("W(|x_i-x_j|)")
+# plt.legend()
+# plt.title("felt interaction for particle x_j due to particle x_i")
+# plt.show()
 
 # plot the 10:th particle's kernel and the 89:th particle's kernel
 plt.plot(x, W[10,:], marker = 'o',label=f"kernel at x[{10}] = {x[10]:.1f}")
@@ -75,7 +78,22 @@ plt.show()
 # density summation test
 sys.density_summation()
 rho = sys.rho
-print()
-print("density vector = ", rho)
+
+
+print("energies = ", sys.e)
+
+# pressure test
+operator = main.NavierStokes1D()
+
+pressure = operator.pressure(sys)
+print("pressure = ", pressure)
+
+
+
+
+
+
+
+
 
 

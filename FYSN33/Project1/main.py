@@ -3,12 +3,13 @@ import matplotlib.pyplot as plt
 
 
 class SPHsystem:
-    def __init__(self, N, kernel):
+    def __init__(self, N, kernel, e0 = 2.5):
         self.N = N # number of particles
         self.kernel = kernel
         
         self.S = np.zeros((N,4)) # s_i = [x_i, v_i, \rho_i, e_i]
         self.m = np.ones(N) # all masses equal
+        self.S[:,3] = e0
 
     # getters
     # defines index convention as:
@@ -28,13 +29,15 @@ class SPHsystem:
 
     @property
     def e(self):
-        return self.S[:, 3]    
+        return self.S[:, 3]
     
     # define the geometry, dx and r = |x_i - x_j|. How to move to 3D in r?
     # note that dx is signed!
     def geom(self):
-        dx = self.x[:,None] - self.x[None,:]
+        # broadcasting (same logic as double loop i,j\in x_linspace)
+        dx = self.x[:,None] - self.x[None,:] 
         r = np.abs(dx)
+        print(np.shape(r))
 
         return dx, r
     
@@ -45,6 +48,8 @@ class SPHsystem:
 
         # fill state vector with densities (rho[:] == S[:,2])
         self.rho[:] = W @ self.m
+
+        # check for numerical stability
         assert np.all(self.rho > 0) and np.isfinite(self.rho).all()
         return self
 
@@ -52,7 +57,7 @@ class SPHsystem:
 class cubicSplineKernel:
     # implements the cubic spline kernel and its analytical derivative
     # (Gaussian looking function, but goes to zero explicitly)
-    # It measures the region of influence particle at x_i exerts on particle at x_j
+    # It measures the "region of influence" particle at x_i exerts on particle at x_j
 
     def __init__(self, h):
         self.h = h
@@ -73,15 +78,27 @@ class cubicSplineKernel:
 
         dWdr = self.a_d * np.piecewise(R, [(R>= 0) & (R<1), (R>=1) & (R<=2)], [f1,f2,0.0])
 
-        # check diags non nan
+        # check diags not nan
         gradW = dWdr * np.sign(dx)
         assert np.allclose(np.diag(gradW), 0.0)
 
         return gradW
     
 
+# NS operator
+class NavierStokes1D:
+    def __init__(self, gamma=1.4):
+        self.gamma = gamma
 
-    
+    def pressure(self,system):
+        rho = system.S[:,2] # extract each density
+        e = system.S[:,3] # extract each internal energy
+        
+        press = (self.gamma - 1) * rho * e
+        
+        # asserts here
+
+        return press
 
 
 
