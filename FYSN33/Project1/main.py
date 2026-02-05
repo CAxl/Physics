@@ -1,14 +1,19 @@
 import numpy as np
 import matplotlib.pyplot as plt
-
+from scipy.integrate import RK45
 
 class SPHsystem:
-    def __init__(self, N, kernel, e0 = 2.5):
+    def __init__(self, N, kernel, v0 = 0, e0 = 2.5):
         self.N = N # number of particles
         self.kernel = kernel
         
         self.S = np.zeros((N,4)) # s_i = [x_i, v_i, \rho_i, e_i]
         self.m = np.ones(N) # all masses equal
+        
+        # initial conditions
+        # position set by linspaces outside
+        self.S[:,1] = v0
+        # density set in density_summation()
         self.S[:,3] = e0
 
     # getters
@@ -37,7 +42,6 @@ class SPHsystem:
         # broadcasting (same logic as double loop i,j\in x_linspace)
         dx = self.x[:,None] - self.x[None,:] 
         r = np.abs(dx)
-        print(np.shape(r))
 
         return dx, r
     
@@ -55,7 +59,7 @@ class SPHsystem:
 
 
 class cubicSplineKernel:
-    # implements the cubic spline kernel and its analytical derivative
+    # implements the piecewise cubic spline kernel and its analytical derivative
     # (Gaussian looking function, but goes to zero explicitly)
     # It measures the "region of influence" particle at x_i exerts on particle at x_j
 
@@ -73,8 +77,8 @@ class cubicSplineKernel:
     def gradW(self, dx, r):
 
         R = np.abs(r)/self.h
-        f1 = -2*R + 1.5 * R**2
-        f2 = -0.5 * (2 - R)**2
+        f1 = lambda R: -2*R + 1.5 * R**2
+        f2 = lambda R: -0.5 * (2 - R)**2
 
         dWdr = self.a_d * np.piecewise(R, [(R>= 0) & (R<1), (R>=1) & (R<=2)], [f1,f2,0.0])
 
@@ -90,15 +94,63 @@ class NavierStokes1D:
     def __init__(self, gamma=1.4):
         self.gamma = gamma
 
-    def pressure(self,system):
+    def pressure(self, system):
         rho = system.S[:,2] # extract each density
         e = system.S[:,3] # extract each internal energy
         
-        press = (self.gamma - 1) * rho * e
+        pressure = (self.gamma - 1) * rho * e
         
         # asserts here
 
-        return press
+        return pressure
+    
+
+    def momentum_equation(self, system):
+        dx, r = system.geom()
+
+        # collect kernel gradient and pressure vector
+        gradW = system.kernel.gradW(dx, r)
+        P = self.pressure(system)
+
+        # term in parenthesis in momentum equation
+        parenthesis = (P[:,None] / system.rho[:,None] # P_i/rho_i²
+                      +P[None,:] / system.rho[None,:] # P_j/rho_j²
+                       ) # + \Pi (viscosity, TBD)
+        
+        dvdt = -np.sum(system.m[None,:] # m_j
+                     * parenthesis * gradW, axis=1) # axis = 1 -> (N,)
+        
+        return dvdt
+
+    def energy_equation(self, system):
+        dx, r = system.geom()
+
+        gradW = system.kernel.gradW(dx, r)
+        P = self.pressure(system)
+        parenthesis = (P[:,None] / system.rho[:,None] # P_i/rho_i²
+                     + P[None,:] / system.rho[None,:] # P_j/rho_j²
+                       ) # + \Pi (viscosity, TBD)
+        
+        vij = system.v[:,None] - system.v[None,:] # v_i - v_j
+
+        dedt = (1/2) * np.sum(system.m[None,:] # m_j
+                            * parenthesis * vij * gradW, axis = 1) 
+        
+        return dedt
+    
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

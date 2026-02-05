@@ -47,9 +47,14 @@ dx, r = sys.geom()
 
 W = kernel.W(r)
 print("kernel W(r) = ", W)
-imshow(W)
-plt.colorbar()
-plt.show()
+# imshow(W)
+# plt.colorbar()
+# plt.show()
+
+dW = kernel.gradW(dx, r)
+# imshow(dW)
+# plt.colorbar()
+# plt.show()
 
 x = sys.x
 
@@ -71,7 +76,7 @@ plt.axvline(x[90], linestyle = '--', alpha = 0.5)
 plt.xlabel("x")
 plt.ylabel("W(r)")
 plt.legend()
-plt.show()
+#plt.show()
 
 
 
@@ -87,6 +92,16 @@ operator = main.NavierStokes1D()
 
 pressure = operator.pressure(sys)
 print("pressure = ", pressure)
+
+# sanity check for state vector:
+S = sys.S
+print(S) # seems correct, position col, vel. col = \vec{0}, density, energy = 2.5 \forall i
+print(S.flatten()) # -> [x_1, v_1, \rho_1, e_1, x_2, v_2, ...] (this good ?)
+
+####################################################
+
+
+
 
 
 
