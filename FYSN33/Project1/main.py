@@ -57,6 +57,25 @@ class SPHsystem:
         # check for numerical stability
         assert np.all(self.rho > 0) and np.isfinite(self.rho).all()
         return self
+    
+
+    # Equations of state
+
+    def pressure(self, gamma=1.4):
+        rho = self.rho # extract each density
+        e = self.e   # extract each internal energy
+        
+        pressure = (gamma - 1) * rho * e
+        
+        # asserts here
+
+        return pressure
+    
+    def sound_speed(self, gamma=1.4):
+        e = self.e
+        c = np.sqrt((gamma - 1) * e)
+
+        return c
 
 
 class cubicSplineKernel:
@@ -92,26 +111,21 @@ class cubicSplineKernel:
 
 # NS operator
 class NavierStokes1D:
-    def __init__(self, gamma=1.4):
-        self.gamma = gamma
 
-    def pressure(self, system):
-        rho = system.S[:,2] # extract each density
-        e = system.S[:,3] # extract each internal energy
-        
-        pressure = (self.gamma - 1) * rho * e
-        
-        # asserts here
-
-        return pressure
-    
+    def __init__(self, alpha = 1.0, beta = 1.0):
+        self.alpha = alpha  # for visc
+        self.beta = beta
 
     def momentum_equation(self, system):
         dx, r = system.geom()
 
         # collect kernel gradient and pressure vector
         gradW = system.kernel.gradW(dx, r)
-        P = self.pressure(system)
+        P = system.pressure()
+
+        # ----------- viscosity ---------
+        
+
 
         # term in parenthesis in momentum equation
         parenthesis = (P[:,None] / system.rho[:,None] # P_i/rho_i²
@@ -127,7 +141,7 @@ class NavierStokes1D:
         dx, r = system.geom()
 
         gradW = system.kernel.gradW(dx, r)
-        P = self.pressure(system)
+        P = system.pressure()
         parenthesis = (P[:,None] / system.rho[:,None] # P_i/rho_i²
                      + P[None,:] / system.rho[None,:] # P_j/rho_j²
                        ) # + \Pi (viscosity, TBD)
@@ -170,7 +184,9 @@ def RHS(t, S_flat, system, NSequations):
     dSdt = np.column_stack((dxdt,
                             dvdt,
                             np.zeros(system.N), # index [2] == rho[:] not updated, recomputed
-                            dedt)) # obs order matters
+                            dedt)) # obs order has to match S index convention
+    
+
     
     return dSdt.ravel()
 
