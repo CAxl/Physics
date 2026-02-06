@@ -58,8 +58,8 @@ rho_L approx 1, rho_R approx 0.25 (nice)
 
 # ------------------- solver -----------------------------
 t0 = 0.0
-T = 0.2
-Nsteps = 40
+T = 10
+Nsteps = 400
 
 times = np.linspace(0,T,Nsteps) # should be 40 time steps (to reproduce slides)
 print(times[1] - times[0])  # dt = 0.005
@@ -84,83 +84,83 @@ sol = solve_ivp(
 # --------------------------------------------------------
 
 
-# ================== static plot rho vs x =========================
-S_final = sol.y[:,-1].reshape(N,4)
+# # ================== static plot rho vs x =========================
+# S_final = sol.y[:,-1].reshape(N,4)
 
-# update the state vector
-system.S[:] = S_final
-# recompute the density! (is it sufficient to only do this at the end?)
-system.density_summation()
+# # update the state vector
+# system.S[:] = S_final
+# # recompute the density! (is it sufficient to only do this at the end?)
+# system.density_summation()
 
-# collect the results
-x_final = system.S[:,0]
-v_final = system.S[:,1]
-rho_final = system.S[:,2]
-e_final = system.S[:,3]
+# # collect the results
+# x_final = system.S[:,0]
+# v_final = system.S[:,1]
+# rho_final = system.S[:,2]
+# e_final = system.S[:,3]
 
-plt.figure()
-plt.scatter(x_final,rho_final,s=8)
-plt.xlim((-0.4,0.4))
-plt.xlabel("x")
-plt.ylabel("rho")
-plt.title("SPH Sod shock - density(x)")
-plt.grid()
-plt.show()
+# plt.figure()
+# plt.scatter(x_final,rho_final,s=8)
+# plt.xlim((-0.4,0.4))
+# plt.xlabel("x")
+# plt.ylabel("rho")
+# plt.title("SPH Sod shock - density(x)")
+# plt.grid()
+# plt.show()
 
-plt.figure()
-plt.scatter(x_final,v_final,s=8)
-plt.xlim((-0.4,0.4))
-plt.xlabel("x")
-plt.ylabel("velocity, v")
-plt.title("SPH Sod shock - velocity(x)")
-plt.grid()
-plt.show()
-
-
-plt.figure()
-plt.scatter(x_final,e_final,s=8)
-plt.xlim((-0.4,0.4))
-plt.xlabel("x")
-plt.ylabel("energy, e")
-plt.title("SPH Sod shock - energy(x)")
-plt.grid()
-plt.show()
+# plt.figure()
+# plt.scatter(x_final,v_final,s=8)
+# plt.xlim((-0.4,0.4))
+# plt.xlabel("x")
+# plt.ylabel("velocity, v")
+# plt.title("SPH Sod shock - velocity(x)")
+# plt.grid()
+# plt.show()
 
 
+# plt.figure()
+# plt.scatter(x_final,e_final,s=8)
+# plt.xlim((-0.4,0.4))
+# plt.xlabel("x")
+# plt.ylabel("energy, e")
+# plt.title("SPH Sod shock - energy(x)")
+# plt.grid()
+# plt.show()
 
 
-# # ===================== Sod shock simulation (no viscosity) =======================
-# fig, ax = plt.subplots(figsize=(7,4))
 
-# scat = ax.scatter([],[],s=12)
-# ax.set_xlim(-0.4,0.4)
-# ax.set_ylim(0.0,1.2)
 
-# ax.set_xlabel("x")
-# ax.set_ylabel("rho(x)")
+# ===================== Sod shock simulation (no viscosity) =======================
+fig, ax = plt.subplots(figsize=(7,4))
 
-# def update(frame):
-#     S = sol.y[:,frame].reshape(N,4) # sol.y is flattened
+scat = ax.scatter([],[],s=12)
+ax.set_xlim(-0.4,0.4)
+ax.set_ylim(0.0,1.2)
 
-#     # update state vector every frame
-#     system.S[:] = S
+ax.set_xlabel("x")
+ax.set_ylabel("rho(x)")
 
-#     # recompute density EACH FRAME (!!! this HAS to be done when putting this into class)
-#     system.density_summation()
+def update(frame):
+    S = sol.y[:,frame].reshape(N,4) # sol.y is flattened
 
-#     # collect position and density
-#     x = system.x
-#     rho = system.rho
+    # update state vector every frame
+    system.S[:] = S
 
-#     scat.set_offsets(np.column_stack((x,rho)))
+    # recompute density EACH FRAME (!!! this HAS to be done when putting this into class)
+    system.density_summation()
 
-#     ax.set_title(f"Density evolution, t = {sol.t[frame]:.4f}")
+    # collect position and density
+    x = system.x
+    rho = system.rho
 
-#     return scat,
+    scat.set_offsets(np.column_stack((x,rho)))
 
-# ani = FuncAnimation(fig, update, frames=len(sol.t),interval=50,blit=True)
-# writer = FFMpegWriter(fps=20,bitrate=1800)
-# ani.save("sod_density_profile.mp4", writer=writer)
+    ax.set_title(f"Density evolution, t = {sol.t[frame]:.4f}")
+
+    return scat,
+
+ani = FuncAnimation(fig, update, frames=len(sol.t),interval=50,blit=True)
+writer = FFMpegWriter(fps=20,bitrate=1800)
+ani.save("./results/sod_density_profile_with_visc.mp4", writer=writer)
 
 
 

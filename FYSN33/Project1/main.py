@@ -40,6 +40,15 @@ class SPHsystem:
     # define the geometry, dx and r = |x_i - x_j|. How to move to 3D in r?
     # note that dx is signed!
     def geom(self):
+        """
+        Docstring for geom
+        
+        calculates the (signed) separation, dx = x_i-x_j, between particles and
+        the (unsigned) distance r_ij = |x_i-x_j| between particles
+
+        given that S[:,0] has been initialized as a position vector
+        """
+
         # broadcasting (same logic as double loop i,j\in x_linspace)
         dx = self.x[:,None] - self.x[None,:] 
         r = np.abs(dx)
@@ -123,14 +132,33 @@ class NavierStokes1D:
         gradW = system.kernel.gradW(dx, r)
         P = system.pressure()
 
-        # ----------- viscosity ---------
-        
+        # ----------- viscosity ----------
+        # for readability, we write the math according to theory
+        # see theory (slides)
+        vij = system.v[:,None] - system.v[None,:] # v_ij = v_i - v_j
+        xij = dx                                  # x_ij = x_i - x_j (already calculated in geom())
+        varphi = 0.1 * system.kernel.h
+
+        phi_ij = system.kernel.h * vij * xij / (r**2 + varphi**2) # r = |x_ij| (geom())
+
+        c = system.sound_speed()
+        cij_bar = 0.5 * (c[:,None] + c[None,:])
+
+        rhoij_bar = 0.5 * (system.rho[:,None] + system.rho[None,:])
+
+        Pi_ij = (-self.alpha * cij_bar * phi_ij + self.beta * phi_ij**2) / rhoij_bar
+
+        # mask the viscosity according condition vij * xij >=0 (theory)
+        vij_xij = xij*vij
+        Pi_ij[vij_xij >= 0] = 0.0
+
+        # ----------------------------------------------
 
 
         # term in parenthesis in momentum equation
         parenthesis = (P[:,None] / system.rho[:,None] # P_i/rho_i²
                       +P[None,:] / system.rho[None,:] # P_j/rho_j²
-                       ) # + \Pi (viscosity, TBD)
+                      +Pi_ij)
         
         dvdt = -np.sum(system.m[None,:] # m_j
                      * parenthesis * gradW, axis=1) # axis = 1 -> (N,)
@@ -142,11 +170,34 @@ class NavierStokes1D:
 
         gradW = system.kernel.gradW(dx, r)
         P = system.pressure()
+           
+
+        # ----------- viscosity ----------
+        # for readability, we write the math according to theory
+        # see theory (slides)
+        vij = system.v[:,None] - system.v[None,:] # v_ij = v_i - v_j
+        xij = dx                                  # x_ij = x_i - x_j (already calculated in geom())
+        varphi = 0.1 * system.kernel.h
+
+        phi_ij = system.kernel.h * vij * xij / (r**2 + varphi**2) # r = |x_ij| (geom())
+
+        c = system.sound_speed()
+        cij_bar = 0.5 * (c[:,None] + c[None,:])
+
+        rhoij_bar = 0.5 * (system.rho[:,None] + system.rho[None,:])
+
+        Pi_ij = (-self.alpha * cij_bar * phi_ij + self.beta * phi_ij**2) / rhoij_bar
+
+        # mask the viscosity according condition vij * xij >=0 (theory)
+        vij_xij = xij*vij
+        Pi_ij[vij_xij >= 0] = 0.0
+
+        # ----------------------------------------------
+        
         parenthesis = (P[:,None] / system.rho[:,None] # P_i/rho_i²
                      + P[None,:] / system.rho[None,:] # P_j/rho_j²
-                       ) # + \Pi (viscosity, TBD)
-        
-        vij = system.v[:,None] - system.v[None,:] # v_i - v_j
+                     + Pi_ij)
+
 
         dedt = (1/2) * np.sum(system.m[None,:] # m_j
                             * parenthesis * vij * gradW, axis = 1) 
@@ -189,106 +240,5 @@ def RHS(t, S_flat, system, NSequations):
 
     
     return dSdt.ravel()
-
-
-
-# first test 
-
-# N = 50
-# x = np.linspace(0,1,N)
-
-# kernel = cubicSplineKernel(h=0.04)
-# system = SPHsystem(N, kernel)
-
-# # initialize S with x-positions
-# system.S[:,0] = x
-# #initialize S with v = 0
-# system.S[:,1] = 0.0
-# system.S[:,3] = 1.0
-
-# # larger energy to the right
-# system.S[x<0.5, 3] = 2.5
-
-# S0 = system.S.ravel()
-
-# NS = NavierStokes1D()
-
-
-# t0 = 0.0
-# T = 0.1
-# Nt = 1000
-# times = np.linspace(t0, T, Nt)
-
-# sol = solve_ivp(
-#     fun=lambda t,y: RHS(t,y,system,NS),
-#     t_span=(t0,T), 
-#     y0 = S0,
-#     method="RK45",
-#     t_eval=times,
-#     rtol=1e-4,
-#     atol=1e-7
-# )
-
-# print(sol.y.shape)        # should be (4*N, Nt)
-
-# S_test = sol.y[:, 0].reshape(N, 4)
-# print(S_test[:5])
-
-
-# times = sol.t
-
-# # for k in range(0, len(times), 5):
-# #     plt.clf()
-
-# #     S_k = sol.y[:, k].reshape(N, 4)
-
-# #     x = S_k[:, 0]
-# #     e = S_k[:, 3]
-
-# #     plt.scatter(x, np.zeros(N), c=e, cmap="viridis")
-# #     plt.colorbar(label="energy")
-
-# #     plt.title(f"t = {times[k]:.4f}")
-# #     plt.xlabel("x")
-# #     plt.pause(0.1)
-
-# fig, ax = plt.subplots()
-
-# scat = ax.scatter([], [], c=[], cmap="viridis", vmin = 0, vmax = 3)
-# ax.set_xlim(-1,2)
-# ax.set_ylim(-0.1,0.1)
-# ax.set_xlabel("x")
-
-# def update(frame):
-#     S_k = sol.y[:,frame].reshape(N,4)
-#     x = S_k[:,0]
-#     e = S_k[:,3]
-
-#     scat.set_offsets(np.c_[x,np.zeros(N)])
-#     scat.set_array(e)
-
-#     ax.set_title(f"t = {times[frame]:.4f}")
-#     return scat,
-
-# ani = FuncAnimation(fig, update, frames=len(times), interval=100)
-# writer = FFMpegWriter(fps=10)
-# ani.save("testanimation.mp4", writer=writer)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
