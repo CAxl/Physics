@@ -1,6 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.integrate import solve_ivp
+from matplotlib.animation import FuncAnimation, FFMpegWriter
 
 class SPHsystem:
     def __init__(self, N, kernel, v0 = 0, e0 = 2.5):
@@ -175,64 +176,88 @@ def RHS(t, S_flat, system, NSequations):
 
 
 
+# first test 
 
-N = 50
-x = np.linspace(0,1,N)
+# N = 50
+# x = np.linspace(0,1,N)
 
-kernel = cubicSplineKernel(h=0.04)
-system = SPHsystem(N, kernel)
+# kernel = cubicSplineKernel(h=0.04)
+# system = SPHsystem(N, kernel)
 
-# initialize S with x-positions
-system.S[:,0] = x
-#initialize S with v = 0
-system.S[:,1] = 0.0
-system.S[:,3] = 1.0
+# # initialize S with x-positions
+# system.S[:,0] = x
+# #initialize S with v = 0
+# system.S[:,1] = 0.0
+# system.S[:,3] = 1.0
 
-# larger energy to the right
-system.S[x<0.5, 3] = 2.5
+# # larger energy to the right
+# system.S[x<0.5, 3] = 2.5
 
-S0 = system.S.ravel()
+# S0 = system.S.ravel()
 
-NS = NavierStokes1D()
-
-
-t0 = 0.0
-T = 0.1
-Nt = 1000
-times = np.linspace(t0, T, Nt)
-
-sol = solve_ivp(
-    fun=lambda t,y: RHS(t,y,system,NS),
-    t_span=(t0,T), 
-    y0 = S0,
-    method="RK45",
-    t_eval=times,
-    rtol=1e-4,
-    atol=1e-7
-)
-
-print(sol.y.shape)        # should be (4*N, Nt)
-
-S_test = sol.y[:, 0].reshape(N, 4)
-print(S_test[:5])
+# NS = NavierStokes1D()
 
 
-times = sol.t
+# t0 = 0.0
+# T = 0.1
+# Nt = 1000
+# times = np.linspace(t0, T, Nt)
 
-for k in range(0, len(times), 5):
-    plt.clf()
+# sol = solve_ivp(
+#     fun=lambda t,y: RHS(t,y,system,NS),
+#     t_span=(t0,T), 
+#     y0 = S0,
+#     method="RK45",
+#     t_eval=times,
+#     rtol=1e-4,
+#     atol=1e-7
+# )
 
-    S_k = sol.y[:, k].reshape(N, 4)
+# print(sol.y.shape)        # should be (4*N, Nt)
 
-    x = S_k[:, 0]
-    e = S_k[:, 3]
+# S_test = sol.y[:, 0].reshape(N, 4)
+# print(S_test[:5])
 
-    plt.scatter(x, np.zeros(N), c=e, cmap="viridis")
-    plt.colorbar(label="energy")
 
-    plt.title(f"t = {times[k]:.4f}")
-    plt.xlabel("x")
-    plt.pause(0.1)
+# times = sol.t
+
+# # for k in range(0, len(times), 5):
+# #     plt.clf()
+
+# #     S_k = sol.y[:, k].reshape(N, 4)
+
+# #     x = S_k[:, 0]
+# #     e = S_k[:, 3]
+
+# #     plt.scatter(x, np.zeros(N), c=e, cmap="viridis")
+# #     plt.colorbar(label="energy")
+
+# #     plt.title(f"t = {times[k]:.4f}")
+# #     plt.xlabel("x")
+# #     plt.pause(0.1)
+
+# fig, ax = plt.subplots()
+
+# scat = ax.scatter([], [], c=[], cmap="viridis", vmin = 0, vmax = 3)
+# ax.set_xlim(-1,2)
+# ax.set_ylim(-0.1,0.1)
+# ax.set_xlabel("x")
+
+# def update(frame):
+#     S_k = sol.y[:,frame].reshape(N,4)
+#     x = S_k[:,0]
+#     e = S_k[:,3]
+
+#     scat.set_offsets(np.c_[x,np.zeros(N)])
+#     scat.set_array(e)
+
+#     ax.set_title(f"t = {times[frame]:.4f}")
+#     return scat,
+
+# ani = FuncAnimation(fig, update, frames=len(times), interval=100)
+# writer = FFMpegWriter(fps=10)
+# ani.save("testanimation.mp4", writer=writer)
+
 
 
 
