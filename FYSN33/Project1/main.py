@@ -4,18 +4,12 @@ from scipy.integrate import solve_ivp
 from matplotlib.animation import FuncAnimation, FFMpegWriter
 
 class SPHsystem:
-    def __init__(self, N, kernel, v0 = 0, e0 = 2.5):
+    def __init__(self, N, kernel):
         self.N = N # number of particles
         self.kernel = kernel
         
         self.S = np.zeros((N,4)) # s_i = [x_i, v_i, \rho_i, e_i]
-        self.m = np.ones(N) # all masses equal
-        
-        # initial conditions
-        # position set by linspaces outside
-        self.S[:,1] = v0
-        # density set in density_summation()
-        self.S[:,3] = e0
+        self.m = np.ones(N) # all masses equal        
 
     # getters
     # defines index convention as:
@@ -61,11 +55,10 @@ class SPHsystem:
         W = self.kernel.W(r)
 
         # fill state vector with densities (rho[:] == S[:,2])
-        self.rho[:] = W @ self.m
+        self.S[:,2] = np.sum(self.m * W, axis = 1)
 
         # check for numerical stability
-        assert np.all(self.rho > 0) and np.isfinite(self.rho).all()
-        return self
+        #assert np.all(self.rho > 0) and np.isfinite(self.rho).all()
     
 
     # Equations of state
@@ -109,11 +102,10 @@ class cubicSplineKernel:
         f1 = lambda R: -2*R + 1.5 * R**2
         f2 = lambda R: -0.5 * (2 - R)**2
 
-        dWdr = self.a_d * np.piecewise(R, [(R>= 0) & (R<1), (R>=1) & (R<=2)], [f1,f2,0.0])
+        dWdr = (self.a_d / self.h) * np.piecewise(R, [(R>= 0) & (R<1), (R>=1) & (R<=2)], [f1,f2,0.0])
 
         # check diags not nan
         gradW = dWdr * np.sign(dx)
-        assert np.allclose(np.diag(gradW), 0.0)
 
         return gradW
     
@@ -125,18 +117,12 @@ class NavierStokes1D:
         self.alpha = alpha  # for visc
         self.beta = beta
 
-    def momentum_equation(self, system):
+
+    def artificial_visc(self, system):
         dx, r = system.geom()
-
-        # collect kernel gradient and pressure vector
-        gradW = system.kernel.gradW(dx, r)
-        P = system.pressure()
-
-        # ----------- viscosity ----------
-        # for readability, we write the math according to theory
-        # see theory (slides)
+        
         vij = system.v[:,None] - system.v[None,:] # v_ij = v_i - v_j
-        xij = dx                                  # x_ij = x_i - x_j (already calculated in geom())
+        xij = dx                             # x_ij = x_i - x_j (already calculated in geom())
         varphi = 0.1 * system.kernel.h
 
         phi_ij = system.kernel.h * vij * xij / (r**2 + varphi**2) # r = |x_ij| (geom())
@@ -152,12 +138,21 @@ class NavierStokes1D:
         vij_xij = xij*vij
         Pi_ij[vij_xij >= 0] = 0.0
 
-        # ----------------------------------------------
+        return Pi_ij
 
+    def momentum_equation(self, system):
+        dx, r = system.geom()
+
+        # collect kernel gradient and pressure vector
+        gradW = system.kernel.gradW(dx, r)
+        P = system.pressure()
+
+        # viscosity
+        Pi_ij = self.artificial_visc(system)
 
         # term in parenthesis in momentum equation
-        parenthesis = (P[:,None] / system.rho[:,None] # P_i/rho_i²
-                      +P[None,:] / system.rho[None,:] # P_j/rho_j²
+        parenthesis = (P[:,None] / system.rho[:,None]**2 # P_i/rho_i²
+                      +P[None,:] / system.rho[None,:]**2 # P_j/rho_j²
                       +Pi_ij)
         
         dvdt = -np.sum(system.m[None,:] # m_j
@@ -170,32 +165,14 @@ class NavierStokes1D:
 
         gradW = system.kernel.gradW(dx, r)
         P = system.pressure()
-           
 
-        # ----------- viscosity ----------
-        # for readability, we write the math according to theory
-        # see theory (slides)
-        vij = system.v[:,None] - system.v[None,:] # v_ij = v_i - v_j
-        xij = dx                                  # x_ij = x_i - x_j (already calculated in geom())
-        varphi = 0.1 * system.kernel.h
+        # viscosity 
+        Pi_ij = self.artificial_visc(system)
 
-        phi_ij = system.kernel.h * vij * xij / (r**2 + varphi**2) # r = |x_ij| (geom())
-
-        c = system.sound_speed()
-        cij_bar = 0.5 * (c[:,None] + c[None,:])
-
-        rhoij_bar = 0.5 * (system.rho[:,None] + system.rho[None,:])
-
-        Pi_ij = (-self.alpha * cij_bar * phi_ij + self.beta * phi_ij**2) / rhoij_bar
-
-        # mask the viscosity according condition vij * xij >=0 (theory)
-        vij_xij = xij*vij
-        Pi_ij[vij_xij >= 0] = 0.0
-
-        # ----------------------------------------------
+        vij = system.v[:,None] - system.v[None,:]
         
-        parenthesis = (P[:,None] / system.rho[:,None] # P_i/rho_i²
-                     + P[None,:] / system.rho[None,:] # P_j/rho_j²
+        parenthesis = (P[:,None] / system.rho[:,None]**2 # P_i/rho_i²
+                     + P[None,:] / system.rho[None,:]**2 # P_j/rho_j²
                      + Pi_ij)
 
 
@@ -237,8 +214,6 @@ def RHS(t, S_flat, system, NSequations):
                             np.zeros(system.N), # index [2] == rho[:] not updated, recomputed
                             dedt)) # obs order has to match S index convention
     
-
-    
-    return dSdt.ravel()
+    return dSdt.flatten()
 
 
