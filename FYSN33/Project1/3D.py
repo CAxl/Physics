@@ -15,6 +15,7 @@ class SPHsystem:
     # getters
     # defines index convention as:
     # S[i][0] = x_i, S[i][1] = v_i, S[i][2] = \rho_i, S[i][3] = e_i
+    # in other words, initialize S using this convention please!
     @property
     def x(self):
         return self.S[:, 0]
@@ -77,7 +78,7 @@ class cubicSplineKernel:
         self.a_d = 1/h # 1D ONLY!!!
     
     def W(self,r):
-        R = np.abs(r)/self.h  # R_ij = |x_i-x_j|/h
+        R = np.abs(r)/self.h    # R_ij = |x_i-x_j|/h
         f1 = lambda R: (2/3) - R**2 + 0.5*R**3
         f2 = lambda R: (1/6) * (2 - R)**3
 
@@ -122,8 +123,8 @@ class NavierStokes1D:
         Pi_ij = (-self.alpha * cij_bar * phi_ij + self.beta * phi_ij**2) / rhoij_bar
 
         # mask the viscosity according condition vij * xij >=0 (theory)
-        vij_dot_xij = xij*vij
-        Pi_ij[vij_dot_xij >= 0] = 0.0
+        vij_xij = xij*vij
+        Pi_ij[vij_xij >= 0] = 0.0
 
         return Pi_ij
 
@@ -169,6 +170,8 @@ class NavierStokes1D:
         return dedt
     
 
+
+# for Sod Shock and for now free function:
 # (put into Solver class eventually)
 def RHS(t, S_flat, system, NSequations):
     """

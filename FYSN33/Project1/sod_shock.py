@@ -21,8 +21,7 @@ x_R = dx_R * np.arange(1, Nx_R+1)
 x = np.concatenate([x_L,x_R])
 N = len(x)
 
-
-# # SPHsys setup
+# SPHsys setup
 kernel = main.cubicSplineKernel(h=0.01) # calculate h later, see slides
 system = main.SPHsystem(N, kernel)
 
@@ -36,17 +35,15 @@ system.S[x<=0, 3] = 2.5 # left region energy
 system.S[x>0, 3] = 1.795 # right region energy
 
 
-# # ------------------- solver -----------------------------
+# ============================= solver =============================
 t0 = 0.0
 dt = 0.005
 Nsteps = 40
 
 times = np.linspace(0,dt*Nsteps,Nsteps) # should be 40 time steps (to reproduce slides)
-print(times[1] - times[0])  # dt = 0.005
 
-S0 = system.S.ravel()   # flatten S -> [x1, v1, rho1, e1, x2, v2,...]
+S0 = system.S.flatten()   # flatten S -> [x1, v1, rho1, e1, x2, v2,...]
 NS = main.NavierStokes1D()
-
 
 sol = solve_ivp(
     fun=lambda t, y: main.RHS(t, y, system, NS),
@@ -59,9 +56,7 @@ sol = solve_ivp(
     atol=1e-7
 )
 
-# # ________________________ static plots ____________________________
-# # trying to reproduce the plots in the slides...
-
+# ========================== static plots =======================
 k = -1  # last (40:th) time step
 S_flat_k = sol.y[:,k]
 
@@ -75,100 +70,84 @@ rho_k = system.rho
 e_k = system.e
 P_k = system.pressure()
 
-print(f"{k}:th pressure vector", P_k)
-
-
-print(f"S at time step = {k}")
-print()
-print(S_k)
-
 plt.plot(x_k, rho_k)
 plt.xlim((-0.4,0.4))
-plt.xlabel("x")
-plt.ylabel("rho")
+plt.xlabel("x [m]")
+plt.ylabel("Density [kg/m³]")
+plt.grid()
 plt.show()
 
 plt.plot(x_k, P_k)
 plt.xlim((-0.4,0.4))
-plt.xlabel("x")
-plt.ylabel("P")
+plt.xlabel("x [m]")
+plt.ylabel("Pressure [N/m²]")
 plt.show()
 
 plt.plot(x_k, v_k)
-plt.xlabel("x")
-plt.ylabel("v")
+plt.xlabel("x [m]")
+plt.ylabel("Velocity [m/s]")
 plt.xlim((-0.4,0.4))
 plt.show()
 
 
 
+#===================== Sod shock simulation =======================
+fig, axs = plt.subplots(4,1,figsize=(8,8))
+(ax_v, ax_rho, ax_p, ax_e) = axs
 
-# #===================== Sod shock simulation =======================
-# fig, ax = plt.subplots(figsize=(7,4))
+scat_v   = ax_v.scatter([], [], s=12)
+scat_rho = ax_rho.scatter([], [], s=12)
+scat_p   = ax_p.scatter([], [], s=12)
+scat_e   = ax_e.scatter([], [], s=12)
 
-# scat = ax.scatter([],[],s=12)
-# ax.set_xlim(-0.4,0.4)
-# ax.set_ylim(0.0,1.2)
 
-# ax.set_xlabel("x")
-# ax.set_ylabel("rho(x)")
+for ax in axs.flat:
+    ax.set_xlim(-0.4, 0.4)
+    ax.set_ylim(0, 1.2)
+    ax.grid()
 
-# def update(frame):
-#     S = sol.y[:,frame].reshape(N,4) # sol.y is flattened
+axs.flat[-1].set_ylim(1,2.8)
 
-#     # update state vector every frame
-#     system.S[:] = S
+ax_v.set_ylabel("Velocity [m/s]")
+ax_rho.set_ylabel("Density [kg/m³]")
+ax_p.set_ylabel("Pressure [N/m²]")
+ax_e.set_ylabel("Energy")
 
-#     # recompute density EACH FRAME (!!! this HAS to be done when putting this into class)
-#     system.density_summation()
-
-#     # collect position and density
-#     x = system.x
-#     rho = system.rho
-
-#     scat.set_offsets(np.column_stack((x,rho)))
-
-#     ax.set_title(f"Density evolution, t = {sol.t[frame]:.4f}")
-
-#     return scat,
-
-# ani = FuncAnimation(fig, update, frames=len(sol.t),interval=50,blit=True)
-# writer = FFMpegWriter(fps=20,bitrate=1800)
-# ani.save("./results/sod_density_debugging.mp4", writer=writer)
+ax_p.set_xlabel("x [m]")
+ax_e.set_xlabel("x [m]")
 
 
 
-# pressure vs x
+def update(frame):
+    S = sol.y[:, frame].reshape(N, 4)
 
-# fig, ax = plt.subplots(figsize=(7,4))
+    system.S[:] = S
+    system.density_summation()
 
-# line, = ax.plot([],[],lw=2)
-# ax.set_xlim(-0.4,0.4)
-# ax.set_ylim(0.0,1.2)
+    x   = system.x
+    v   = system.v
+    rho = system.rho
+    e   = system.e
+    P   = system.pressure()
 
-# ax.set_xlabel("x")
-# ax.set_ylabel("P(x)")
+    scat_v.set_offsets(np.column_stack((x, v)))
+    scat_rho.set_offsets(np.column_stack((x, rho)))
+    scat_p.set_offsets(np.column_stack((x, P)))
+    scat_e.set_offsets(np.column_stack((x, e)))
 
-# def update(frame):
-#     S_flat = sol.y[:, frame]
-#     S = S_flat.reshape(N,4)
+    fig.suptitle(f"Sod shock tube — t = {sol.t[frame]:.4f}")
 
-#     x = S[:,0]
-#     rho = S[:,2]
-
-#     line.set_data(x,rho)
-
-#     return (line,)
-
-# ani = FuncAnimation(fig, update, frames=len(sol.t),interval=50,blit=True)
-# writer = FFMpegWriter(fps=20,bitrate=1800)
-# ani.save("./results/sod_pressure_profilec.mp4", writer=writer)
+    return scat_v, scat_rho, scat_p, scat_e
 
 
+ani = FuncAnimation(
+    fig,
+    update,
+    frames=len(sol.t),
+    interval=50,
+    blit=True
+)
 
-
-
-
-
-
+writer = FFMpegWriter(fps=10, bitrate=1800)
+ani.save("./results/sod_all_fields_vs_x.mp4", writer=writer)
 
