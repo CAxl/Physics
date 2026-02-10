@@ -29,86 +29,40 @@ from matplotlib.pyplot import imshow
 # print("looping sum takes ", round(t1 - t0, 4), "seconds")
 
 
-# print("=========================================================")
-# print(summ)
-# print("=========================================================")
-# print(sumxy)
 
 
-# testing N particles with kernels
+dim = 3
+N = 3
+# slicing matrix
+S = np.zeros((N, 2*dim +2))
 
-N = 100
-kernel = main.cubicSplineKernel(h=1.0)
-sys = main.SPHsystem(N, kernel)
-sys.S[:,0] = np.linspace(-10,10,N) # NOTE: could also initialize as sys.x == sys.S[:,0]
+#print(S)
 
-dx, r = sys.geom()
-#print("dx matrix = ", dx)
+x = np.array([1, 100, 200])
+y = np.array([1,2,3])
+z = np.ones(N)
 
-W = kernel.W(r)
-print("kernel W(r) = ", W)
-imshow(W)
-plt.colorbar()
-plt.title("Kernel, W_ij")
-plt.xlabel("particle i")
-plt.ylabel("particle j")
-plt.show()
+r = np.column_stack((x,y,z))
+S[:,:dim] = r
 
-dW = kernel.gradW(dx, r)
-imshow(dW)
-plt.colorbar()
-plt.title("Kernel gradient, grad W_ij")
-plt.xlabel("particle i")
-plt.ylabel("particle j")
-plt.show()
 
-x = sys.x
+print(r.shape)
+ri = r[:,None,:]
+#print(ri)
+rj = r[None,:,:]
 
-# for i in range(sys.N):
-#     plt.plot(x, W[i,:], marker = 'o', label=f"kernel at x[{i}] = {x[i]:.1f}")
-#     plt.axvline(x[i], linestyle='--', alpha = 0.5)
+print(ri)
+print()
+print(rj)
 
-# plt.xlabel("absolute position, x")
-# plt.ylabel("W(|x_i-x_j|)")
-# plt.legend()
-# plt.title("felt interaction for particle x_j due to particle x_i")
+print()
+print(ri.shape)
+print(rj.shape)
+
+print(ri-rj)
+
+
+# plt.imshow(S)
 # plt.show()
-
-# plot the 10:th particle's kernel and the 89:th particle's kernel
-plt.plot(x, W[10,:], marker = 'o',label=f"kernel at x[{10}] = {x[10]:.1f}")
-plt.plot(x, W[90,:], marker = 'o',label=f"kernel at x[{90}] = {x[90]:.1f}")
-plt.axvline(x[10], linestyle = '--', alpha = 0.5)
-plt.axvline(x[90], linestyle = '--', alpha = 0.5)
-plt.xlabel("x")
-plt.ylabel("W(r)")
-plt.title("Two kernels for N=100 equidistant particles")
-plt.legend()
-plt.show()
-
-
-
-# density summation test
-sys.density_summation()
-rho = sys.rho
-
-
-print("energies = ", sys.e)
-
-# pressure test
-operator = main.NavierStokes1D()
-
-pressure = sys.pressure()
-print("pressure = ", pressure)
-
-# sanity check for state vector:
-S = sys.S
-#print(S) # seems correct, position col, vel. col = \vec{0}, density, energy = 2.5 \forall i
-#print(S.flatten()) # -> [x_1, v_1, \rho_1, e_1, x_2, v_2, ...] (this good ?)
-
-
-
-
-
-
 
 

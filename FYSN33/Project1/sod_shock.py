@@ -111,7 +111,7 @@ axs.flat[-1].set_ylim(1,2.8)
 ax_v.set_ylabel("Velocity [m/s]")
 ax_rho.set_ylabel("Density [kg/m³]")
 ax_p.set_ylabel("Pressure [N/m²]")
-ax_e.set_ylabel("Energy")
+ax_e.set_ylabel("Internal energy [J/kg]")
 
 ax_p.set_xlabel("x [m]")
 ax_e.set_xlabel("x [m]")

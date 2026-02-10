@@ -4,58 +4,54 @@ from scipy.integrate import solve_ivp
 from matplotlib.animation import FuncAnimation, FFMpegWriter
 
 class SPHsystem:
-    def __init__(self, N, kernel, gamma = 1.4):
+    def __init__(self, N, dim, kernel, gamma = 1.4):
         self.N = N # number of particles
+        self.dim = dim # dimension of the problem
         self.kernel = kernel
         self.gamma = gamma
-        
-        self.S = np.zeros((N,4)) # s_i = [x_i, v_i, \rho_i, e_i]
-        self.m = np.ones(N) # all masses equal        
+
+        self.S = np.zeros((N, 2*dim + 2)) # s_i (row) = [r_i (dim) | v_i (dim) | rho_i (1) | e_i (1)]
+        self.m = np.ones(N) # all masses equal
 
     # getters
     # defines index convention as:
-    # S[i][0] = x_i, S[i][1] = v_i, S[i][2] = \rho_i, S[i][3] = e_i
-    # in other words, initialize S using this convention please!
+    # (dim==3): S[i][0] = x_i, S[i][1] = y_i, ..., S[i][-2] = \rho_i, S[i][-1] = e_i
     @property
-    def x(self):
-        return self.S[:, 0]
-
+    def r(self):
+        return self.S[:,:self.dim]
+    
     @property
     def v(self):
-        return self.S[:, 1]
-
-    @property
-    def rho(self):
-        return self.S[:, 2]
-
-    @property
-    def e(self):
-        return self.S[:, 3]
+        return self.S[:,self.dim:2*self.dim]
     
-    # define the geometry, dx and r = |x_i - x_j|. How to move to 3D in r?
-    # note that dx is signed!
+    def rho(self):
+        return self.S[:,2*self.dim]
+    
+    def e(self):
+        return self.S[:,2*self.dim + 1]
+    
+
     def geom(self):
         """
-        Docstring for geom
-        
-        calculates the (signed) separation, dx = x_i-x_j, between particles and
-        the (unsigned) distance r_ij = |x_i-x_j| between particles
+        black magic
 
-        given that S[:,0] has been initialized as a position vector
+        (in test case this looks correct)
         """
-        
-        dx = self.x[:,None] - self.x[None,:] 
-        r = np.abs(dx)
+        ri = self.r[:,np.newaxis,:] # ri[i,0,:] = ri
+        rj = self.r[np.newaxis,:,:] # rj[0,j,:] = rj
 
-        return dx, r
+        drij = ri - rj  # drij[i,j,:] = ri - rj
+        r = np.linalg.norm(drij, axis=2)
+
+        return drij, r
     
     # density summation
     def density_summation(self):
-        dx, r = self.geom()
+        drij, r = self.geom()
         W = self.kernel.W(r)
 
-        # fill state vector with densities (rho[:] == S[:,2])
-        self.S[:,2] = np.sum(self.m * W, axis = 1)
+        # fill state vector with densities (rho == S[:,2*self.dim])
+        self.rho = np.sum(self.m * W, axis = 1)
 
     # Equations of state
     def pressure(self):
@@ -73,12 +69,18 @@ class cubicSplineKernel:
     measures the "region of influence" particle at x_i exerts on particle at x_j
     """
 
-    def __init__(self, h):
+    def __init__(self, dim, h):
         self.h = h
-        self.a_d = 1/h # 1D ONLY!!!
+
+        if dim == 1:
+            self.a_d = 1/h # 1D ONLY!!!
+        elif dim == 2:
+            self.a_d = 17 / (7*np.pi*h**2)
+        elif dim == 3:
+            self.a_d = 3 / (2*np.pi*h**3)
     
     def W(self,r):
-        R = np.abs(r)/self.h    # R_ij = |x_i-x_j|/h
+        R = np.abs(r)/self.h  # R_ij = |x_i-x_j|/h
         f1 = lambda R: (2/3) - R**2 + 0.5*R**3
         f2 = lambda R: (1/6) * (2 - R)**3
 
@@ -98,110 +100,108 @@ class cubicSplineKernel:
         return gradW
     
 
-# NS operator
-class NavierStokes1D:
+# # NS operator
+# class NavierStokes1D:
 
-    def __init__(self, alpha = 1.0, beta = 1.0):
-        self.alpha = alpha  # for visc
-        self.beta = beta
+#     def __init__(self, alpha = 1.0, beta = 1.0):
+#         self.alpha = alpha  # for visc
+#         self.beta = beta
 
 
-    def artificial_visc(self, system):
-        dx, r = system.geom()
+#     def artificial_visc(self, system):
+#         dx, r = system.geom()
         
-        vij = system.v[:,None] - system.v[None,:] # v_ij = v_i - v_j
-        xij = dx                             # x_ij = x_i - x_j (already calculated in geom())
-        varphi = 0.1 * system.kernel.h
+#         vij = system.v[:,None] - system.v[None,:] # v_ij = v_i - v_j
+#         xij = dx                             # x_ij = x_i - x_j (already calculated in geom())
+#         varphi = 0.1 * system.kernel.h
 
-        phi_ij = system.kernel.h * vij * xij / (r**2 + varphi**2) # r = |x_ij| (geom())
+#         phi_ij = system.kernel.h * vij * xij / (r**2 + varphi**2) # r = |x_ij| (geom())
 
-        c = system.sound_speed()
-        cij_bar = 0.5 * (c[:,None] + c[None,:])
+#         c = system.sound_speed()
+#         cij_bar = 0.5 * (c[:,None] + c[None,:])
 
-        rhoij_bar = 0.5 * (system.rho[:,None] + system.rho[None,:])
+#         rhoij_bar = 0.5 * (system.rho[:,None] + system.rho[None,:])
 
-        Pi_ij = (-self.alpha * cij_bar * phi_ij + self.beta * phi_ij**2) / rhoij_bar
+#         Pi_ij = (-self.alpha * cij_bar * phi_ij + self.beta * phi_ij**2) / rhoij_bar
 
-        # mask the viscosity according condition vij * xij >=0 (theory)
-        vij_xij = xij*vij
-        Pi_ij[vij_xij >= 0] = 0.0
+#         # mask the viscosity according condition vij * xij >=0 (theory)
+#         vij_dot_xij = xij*vij
+#         Pi_ij[vij_dot_xij >= 0] = 0.0
 
-        return Pi_ij
+#         return Pi_ij
 
-    def momentum_equation(self, system):
-        dx, r = system.geom()
+#     def momentum_equation(self, system):
+#         dx, r = system.geom()
 
-        # collect kernel gradient and pressure vector
-        gradW = system.kernel.gradW(dx, r)
-        P = system.pressure()
+#         # collect kernel gradient and pressure vector
+#         gradW = system.kernel.gradW(dx, r)
+#         P = system.pressure()
 
-        # viscosity
-        Pi_ij = self.artificial_visc(system)
+#         # viscosity
+#         Pi_ij = self.artificial_visc(system)
 
-        # term in parenthesis in momentum equation
-        parenthesis = (P[:,None] / system.rho[:,None]**2 # P_i/rho_i²
-                      +P[None,:] / system.rho[None,:]**2 # P_j/rho_j²
-                      +Pi_ij)
+#         # term in parenthesis in momentum equation
+#         parenthesis = (P[:,None] / system.rho[:,None]**2 # P_i/rho_i²
+#                       +P[None,:] / system.rho[None,:]**2 # P_j/rho_j²
+#                       +Pi_ij)
         
-        dvdt = -np.sum(system.m[None,:] # m_j
-                     * parenthesis * gradW, axis=1) # axis = 1 -> (N,)
+#         dvdt = -np.sum(system.m[None,:] # m_j
+#                      * parenthesis * gradW, axis=1) # axis = 1 -> (N,)
         
-        return dvdt
+#         return dvdt
 
-    def energy_equation(self, system):
-        dx, r = system.geom()
+#     def energy_equation(self, system):
+#         dx, r = system.geom()
 
-        gradW = system.kernel.gradW(dx, r)
-        P = system.pressure()
+#         gradW = system.kernel.gradW(dx, r)
+#         P = system.pressure()
 
-        # viscosity 
-        Pi_ij = self.artificial_visc(system)
+#         # viscosity 
+#         Pi_ij = self.artificial_visc(system)
 
-        vij = system.v[:,None] - system.v[None,:]
+#         vij = system.v[:,None] - system.v[None,:]
         
-        parenthesis = (P[:,None] / system.rho[:,None]**2 # P_i/rho_i²
-                     + P[None,:] / system.rho[None,:]**2 # P_j/rho_j²
-                     + Pi_ij)
+#         parenthesis = (P[:,None] / system.rho[:,None]**2 # P_i/rho_i²
+#                      + P[None,:] / system.rho[None,:]**2 # P_j/rho_j²
+#                      + Pi_ij)
 
 
-        dedt = (1/2) * np.sum(system.m[None,:] # m_j
-                            * parenthesis * vij * gradW, axis = 1) 
+#         dedt = (1/2) * np.sum(system.m[None,:] # m_j
+#                             * parenthesis * vij * gradW, axis = 1) 
         
-        return dedt
+#         return dedt
     
 
+# # (put into Solver class eventually)
+# def RHS(t, S_flat, system, NSequations):
+#     """
+#     RHS of the ODE:
 
-# for Sod Shock and for now free function:
-# (put into Solver class eventually)
-def RHS(t, S_flat, system, NSequations):
-    """
-    RHS of the ODE:
+#     f(y,t) = dy/dt
 
-    f(y,t) = dy/dt
+#     dy/dt is dS/dt = [\dot{x}, \dot{v}, \dot{rho}, \dot{e}]
 
-    dy/dt is dS/dt = [\dot{x}, \dot{v}, \dot{rho}, \dot{e}]
+#     Computes dS/dt given the current flattedned state vector
+#     RHS required by scipy.solve_ivp 
+#     """
 
-    Computes dS/dt given the current flattedned state vector
-    RHS required by scipy.solve_ivp 
-    """
+#     # rebuild the State vector (matrix) as the (N,4) shape
+#     S = S_flat.reshape(system.N, 4) 
+#     system.S[:] = S # update object
 
-    # rebuild the State vector (matrix) as the (N,4) shape
-    S = S_flat.reshape(system.N, 4) 
-    system.S[:] = S # update object
+#     # update density (summation, not continuity)
+#     system.density_summation()
 
-    # update density (summation, not continuity)
-    system.density_summation()
+#     # compute time derivatives
+#     dxdt = system.v
+#     dvdt = NSequations.momentum_equation(system)
+#     dedt = NSequations.energy_equation(system)
 
-    # compute time derivatives
-    dxdt = system.v
-    dvdt = NSequations.momentum_equation(system)
-    dedt = NSequations.energy_equation(system)
-
-    dSdt = np.column_stack((dxdt,
-                            dvdt,
-                            np.zeros(system.N), # index [2] == rho[:] not updated, recomputed
-                            dedt)) # obs order has to match S index convention
+#     dSdt = np.column_stack((dxdt,
+#                             dvdt,
+#                             np.zeros(system.N), # index [2] == rho[:] not updated, recomputed
+#                             dedt)) # obs order has to match S index convention
     
-    return dSdt.flatten()
+#     return dSdt.flatten()
 
 
