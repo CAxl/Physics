@@ -37,14 +37,17 @@ class SPHsystem:
 
     def geom(self):
         """
-        black magic
+        Think of every property as indexed [i,j,k]
+        i = particle index treated
+        j = neighbouring particle j \in {0,N}
+        k = x,y,z
 
         (in test case this looks correct)
         """
-        ri = self.r[:,np.newaxis,:] # ri[i,0,:] = ri
-        rj = self.r[np.newaxis,:,:] # rj[0,j,:] = rj
+        ri = self.r[:,None,:] # ri[i,0,:] = ri
+        rj = self.r[None,:,:] # rj[0,j,:] = rj
 
-        rij = ri - rj  # drij[i,j,:] = ri - rj   (relative vector)
+        rij = ri - rj  # rij[i,j,:] = ri - rj   (relative vector)
         rij_norm = np.linalg.norm(rij, axis=2) # (relative distance)
 
         return rij, rij_norm
@@ -84,7 +87,7 @@ class cubicSplineKernel:
             self.a_d = 3 / (2*np.pi*h**3)
     
     def W(self, rij_norm):
-        R = rij_norm/self.h  # R = |x_i-x_j|/h
+        R = np.abs(rij_norm)/self.h  # R = |x_i-x_j|/h
         f1 = lambda R: (2/3) - R**2 + 0.5*R**3
         f2 = lambda R: (1/6) * (2 - R)**3
 
@@ -92,56 +95,275 @@ class cubicSplineKernel:
 
 
     def gradW(self, rij, rij_norm):
-        R = rij_norm/self.h
+        R = np.abs(rij_norm)/self.h
 
-        f1 = lambda R: (-2 + 1.5*R) * (rij / self.h**2)
-        f2 = lambda R: -0.5*(2 - R)**2 * rij / (rij_norm * self.h)
+        gradW = np.zeros_like(rij)  # preallocate (N,N,dim)
 
-        gradW = self.a_d * np.piecewise(R, [(R>= 0) & (R<1), (R>=1) & (R<=2)], [f1,f2,0.0])
-        
-        # protect against nan where |r_i - r_j| = 0 (diagonal)
-        np.fill_diagonal(gradW, 0.0)
+        mask1 = (R >= 0) & (R < 1)
+        mask2 = (R >= 1) & (R <=2)
+
+        gradW[mask1] = self.a_d * (-2 + 1.5 * R[mask1][:,None]) * rij[mask1] / self.h**2
+        gradW[mask2] = -self.a_d * 0.5 * (2 - R[mask2][:,None])**2 * rij[mask2] / (rij_norm[mask2][:,None] * self.h)      
 
         return gradW
+    
+class NSequations:
+    def __init__(self, alpha = 1.0, beta = 1.0):
+        self.alpha = alpha
+        self.beta = beta
+
+    def artifical_visc(self, system):
+        rij, rij_norm = system.geom()
+
+        # \vec{v}_{ij} = (v_{x,i} - v_{x,j}, v_{y,i} - v_{y,j}, v_{z,i} - v_{z,j})
+        # vij[i,j,0] = x component
+        # vij[i,j,1] = y component
+        # vij[i,j,2] = z component
+        # velocity differences (N,N,dim)
+        vij = system.v[:,np.newaxis,:] - system.v[np.newaxis,:,:]
+        vij_dot_rij = np.sum(vij*rij, axis=2)
+
+        # phi_ij function
+        varphi = 0.1 * system.kernel.h
+        phi_ij = system.kernel.h * vij_dot_rij / (rij_norm**2 + varphi**2)
+
+        # sound speed
+        c = system.sound_speed()
+        cij_bar = 0.5 * (c[:,None] + c[None,:])
+
+        # density, \bar{rho}_ij
+        rhoij_bar = 0.5 * (system.rho[:,None] + system.rho[None,:])
+        
+        # viscosity
+        Pi_ij = (-self.alpha * cij_bar * phi_ij + self.beta * phi_ij**2) / rhoij_bar
+
+        # mask the viscosity according condition vij * xij >=0 (theory)
+        Pi_ij[vij_dot_rij >= 0] = 0.0
+
+        return Pi_ij
+    
+    def momentum_equation(self,system):
+        rij, rij_norm = system.geom()
+
+        # collect kernel gradient and pressure from system
+        gradW = system.kernel.gradW(rij,rij_norm)   # (N,N,dim)
+        P = system.pressure()
+
+        # collect viscosity from self
+        Pi_ij = self.artifical_visc(system)
+
+        # term in parenthesis in momentum equation
+        parenthesis = (P[:,None] / system.rho[:,None]**2 # P_i/rho_i²
+                      +P[None,:] / system.rho[None,:]**2 # P_j/rho_j²
+                      +Pi_ij)   # (N,N)
+        
+        # gradW[i,j,k]
+        # i = particle updated
+        # j = neighboring particle
+        # k = x,y,z component
+        # \sum_j m_j(...)\nabla_iW_ij -> axis = 1 == j
+
+        dvdt = -np.sum(system.m[None,:,None] * parenthesis[:,:,None] * gradW, axis=1) #[i,j,k] sum over j (axis 1)
+
+        return dvdt # (N,dim)
+
+
+    def energy_equation(self, system):
+        rij, rij_norm = system.geom()
+
+        # collect gradW, pressure
+        gradW = system.kernel.gradW(rij,rij_norm)
+        P = system.pressure()
+
+        # [i,j,k]
+        # v_ik = v[:,None,:], v_jk = v[None,:,:]
+        vij = system.v[:,None,:] - system.v[None,:,:] # (N,N,dim)
+        
+        # viscosity
+        Pi_ij = self.artifical_visc(system)
+
+        parenthesis = (P[:,None] / system.rho[:,None]**2 # P_i/rho_i²
+                      +P[None,:] / system.rho[None,:]**2 # P_j/rho_j²
+                      +Pi_ij)   # (N,N)
+        
+        # dot product (\vec{v}\cdot\nabla_iW_ij)
+        vij_dot_gradW = np.sum(vij * gradW,axis=2) # sum over k (x,y,z) since dotproduct -> (N,N)
+
+        dedt = 0.5 * np.sum(system.m[None,:] # m_j (no k:th index)
+                          * parenthesis * vij_dot_gradW, axis = 1) # (N,)
+
+        return dedt
+
+def RHS(t, S_flat, system, NSequations):
+
+    # rebuild state vector (matrix) as the (N, 2dim+2) shape
+    S = S_flat.reshape(system.N, 2*system.dim + 2)
+    system.S[:] = S # update object
+
+    # update density
+    system.density_summation()
+
+    # compute time derivatives
+    drdt = system.v # (N,dim)
+    dvdt = NSequations.momentum_equation(system)
+    dedt = NSequations.energy_equation(system)
+
+    # preallocate dSdt with shape == S
+    # dSdt = [\dot{r}(dim) | \dot{v} (dim) | \dot{rho} (1) | \dot{e} (1)]
+    dSdt = np.zeros_like(system.S)
+
+    # fill blocks
+    dSdt[:, :system.dim] = drdt
+    dSdt[:, system.dim:2*system.dim] = dvdt
+    dSdt[:,-2] = 0.0 # rho not updated, recomputed
+    dSdt[:, -1] = dedt   
+
+
+    return dSdt.flatten()
 
 
 
 
-dim = 3
-kernel = cubicSplineKernel(dim, h=1.0)
-sys = SPHsystem(3,dim,kernel)
+# dim = 3
+# kernel = cubicSplineKernel(dim, h=1.0)
+# sys = SPHsystem(3,dim,kernel)
+
+# rij, rij_norm  = sys.geom()
+
+# x = np.array([0,2,4])
+# y = np.array([0,3,1])
+# z = np.array([0,0,0])
+
+# r = np.column_stack((x,y,z))    # -> one particle at (x,y) = (0,0), one at (2,3) and one at (4,1)
+# sys.S[:,:dim] = r
+
+
+# print(r[0])
+# print(r[1])
+# print(r[2])
 
 
 
-x = np.array([0,2,4])
-y = np.array([0,3,1])
-z = np.array([0,0,0])
+# 3D plotting
 
-r = np.column_stack((x,y,z))    # -> one particle at (x,y) = (0,0), one at (2,3) and one at (4,1)
-sys.S[:,:dim] = r
+# x = np.linspace(-2, 5,100)
+# y = np.linspace(-2, 5,100)
+# X, Y = np.meshgrid(x, y)
+# Z = np.zeros_like(X)
+# Wtot = np.zeros_like(X)
 
-print(sys.S)
-
-x = np.linspace(-2, 5,100)
-y = np.linspace(-2, 5,100)
-X, Y = np.meshgrid(x, y)
-Z = np.zeros_like(X)
-Wtot = np.zeros_like(X)
-
-for r_i in r:
-    dx = X - r_i[0]
-    dy = Y - r_i[1]
-    dz = Z - r_i[2]
-    R  = np.sqrt(dx**2 + dy**2 + dz**2)
-    Wtot += kernel.W(R)
+# for r_i in r:
+#     dx = X - r_i[0]
+#     dy = Y - r_i[1]
+#     dz = Z - r_i[2]
+#     R  = np.sqrt(dx**2 + dy**2 + dz**2)
+#     Wtot += kernel.W(R)
 
 
-fig = plt.figure()
-ax = fig.add_subplot(111, projection='3d')
-ax.plot_surface(X, Y, Wtot, cmap="viridis")
-ax.set_xlabel("x")
-ax.set_ylabel("y")
-plt.show()
+# fig = plt.figure()
+# ax = fig.add_subplot(111, projection='3d')
+# ax.plot_surface(X, Y, Wtot, cmap="viridis")
+# ax.set_xlabel("x")
+# ax.set_ylabel("y")
+# plt.show()
+
+
+
+# ================ testing gradW ==============
+
+# # 1D
+# N = 100
+# dim = 1
+# kernel = cubicSplineKernel(dim, h=1.0)
+# sys = SPHsystem(N, dim, kernel)
+
+# print(sys.S)
+
+# sys.S[:,0] = np.linspace(0,10,N)
+
+# plt.imshow(sys.S)
+# #plt.show()
+
+# r = sys.r
+# print(r.shape)
+# x = r[:,0]
+
+# rij, rij_norm = sys.geom()
+# dw = kernel.gradW(rij, rij_norm)
+
+# # w = kernel.W(rij_norm)
+# # plt.imshow(w)
+# # plt.colorbar()
+# # plt.show()
+
+# plt.imshow(dw)
+# plt.colorbar()
+# plt.show()
+
+
+# print(dw.shape)
+# print(dw)
+
+
+# #3D
+# N = 100
+# dim = 3
+# kernel = cubicSplineKernel(dim,h=1.0)
+# system = SPHsystem(N,dim,kernel)
+
+# r = np.column_stack((np.linspace(0,10,N), np.linspace(0,10,N), np.linspace(0,10,N)))
+
+# system.S[:,:dim] = r
+
+# print(system.S)
+# plt.imshow(system.S)
+# plt.show()
+
+# rij, rij_norm = system.geom()
+# print(rij.shape)
+# print(rij_norm.shape)
+
+# print(rij_norm)
+# W = kernel.W(rij_norm)
+# print(W.shape)
+
+# plt.imshow(W)
+# plt.show()
+
+# dw = kernel.gradW(rij, rij_norm)
+# print(dw.shape)
+
+
+# # test slicing
+# N = 3
+# dim = 3
+# kernel = cubicSplineKernel(dim,h=1.0)
+# sys = SPHsystem(N,dim,kernel)
+
+# vx = np.array([1,2,3])
+# vy = np.array([5,4,3])
+# vz = np.array([0,0,0])
+
+# v_vec = np.column_stack((vx,vy,vz))
+# sys.S[:,dim:2*dim] = v_vec
+
+
+# print("vx particle 0 = ", sys.v[0][0])
+# print("vx particle 1 = ", sys.v[1][0])
+# print("vx particle 2 = ", sys.v[2][0])
+
+# print("vy particle 0 = ", sys.v[0][1])
+
+# #print(sys.S)
+
+# # v[i][j][0] v_xi - v_xj
+# # v[i][j][1] v_yi - v_yj
+# vij = sys.v[:,np.newaxis,:] - sys.v[np.newaxis,:,:]
+
+
+
+# print("v_x0 - v_x1 = ", vij[0,1,0])
+
 
 
 

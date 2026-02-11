@@ -202,3 +202,10 @@ def RHS(t, S_flat, system, NSequations):
     return dSdt.flatten()
 
 
+
+
+
+
+
+
+

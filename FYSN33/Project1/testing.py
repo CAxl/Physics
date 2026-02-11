@@ -66,3 +66,33 @@ print(ri-rj)
 # plt.show()
 
 
+
+
+# 3D table
+# vx = np.array([1,2,3])
+# vy = np.array([5,4,3])
+# vz = np.array([0,0,0])
+
+# v_vec = np.column_stack((vx,vy,vz))
+# sys.S[:,dim:2*dim] = v_vec
+
+
+# print("vx particle 0 = ", sys.v[0][0])
+# print("vx particle 1 = ", sys.v[1][0])
+# print("vx particle 2 = ", sys.v[2][0])
+
+# print("vy particle 0 = ", sys.v[0][1])
+
+# v[i][j][0] v_xi - v_xj
+# v[i][j][1] v_yi - v_yj
+# vij = sys.v[:,np.newaxis,:] - sys.v[np.newaxis,:,:]
+
+
+# gradW[i, j, k]
+# i = particle being updated
+# j = neighbor particle
+# k = x,y,z component
+
+
+
+
