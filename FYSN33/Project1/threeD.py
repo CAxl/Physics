@@ -215,7 +215,7 @@ def RHS(t, S_flat, system, NSequations):
     # fill blocks
     dSdt[:, :system.dim] = drdt
     dSdt[:, system.dim:2*system.dim] = dvdt
-    dSdt[:,-2] = 0.0 # rho not updated, recomputed
+    dSdt[:, -2] = 0.0 # rho not updated, recomputed
     dSdt[:, -1] = dedt   
 
 
