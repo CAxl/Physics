@@ -2,6 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy.integrate import solve_ivp
 from matplotlib.animation import FuncAnimation, FFMpegWriter
+from mpl_toolkits.mplot3d import Axes3D
 
 class SPHsystem:
     def __init__(self, N, dim, kernel, gamma = 1.4):
@@ -16,6 +17,7 @@ class SPHsystem:
     # getters
     # defines index convention as:
     # (dim==3): S[i][0] = x_i, S[i][1] = y_i, ..., S[i][-2] = \rho_i, S[i][-1] = e_i
+    # S[i] = r[i] = [x,y,z]
     @property
     def r(self):
         return self.S[:,:self.dim]
@@ -24,9 +26,11 @@ class SPHsystem:
     def v(self):
         return self.S[:,self.dim:2*self.dim]
     
+    @property
     def rho(self):
         return self.S[:,2*self.dim]
     
+    @property
     def e(self):
         return self.S[:,2*self.dim + 1]
     
@@ -40,18 +44,18 @@ class SPHsystem:
         ri = self.r[:,np.newaxis,:] # ri[i,0,:] = ri
         rj = self.r[np.newaxis,:,:] # rj[0,j,:] = rj
 
-        drij = ri - rj  # drij[i,j,:] = ri - rj
-        r = np.linalg.norm(drij, axis=2)
+        rij = ri - rj  # drij[i,j,:] = ri - rj   (relative vector)
+        rij_norm = np.linalg.norm(rij, axis=2) # (relative distance)
 
-        return drij, r
+        return rij, rij_norm
     
     # density summation
     def density_summation(self):
-        drij, r = self.geom()
-        W = self.kernel.W(r)
+        rij, rij_norm = self.geom()
+        W = self.kernel.W(rij_norm)  # W(|r_i - r_j|)
 
         # fill state vector with densities (rho == S[:,2*self.dim])
-        self.rho = np.sum(self.m * W, axis = 1)
+        self.S[:,2*self.dim] = np.sum(self.m * W, axis = 1)
 
     # Equations of state
     def pressure(self):
@@ -73,135 +77,71 @@ class cubicSplineKernel:
         self.h = h
 
         if dim == 1:
-            self.a_d = 1/h # 1D ONLY!!!
+            self.a_d = 1/h 
         elif dim == 2:
-            self.a_d = 17 / (7*np.pi*h**2)
+            self.a_d = 15 / (7*np.pi*h**2)
         elif dim == 3:
             self.a_d = 3 / (2*np.pi*h**3)
     
-    def W(self,r):
-        R = np.abs(r)/self.h  # R_ij = |x_i-x_j|/h
+    def W(self, rij_norm):
+        R = rij_norm/self.h  # R = |x_i-x_j|/h
         f1 = lambda R: (2/3) - R**2 + 0.5*R**3
         f2 = lambda R: (1/6) * (2 - R)**3
 
         return self.a_d * np.piecewise(R, [(R>= 0) & (R<1), (R>=1) & (R<=2)], [f1,f2,0.0])
 
-    def gradW(self, dx, r):
 
-        R = np.abs(r)/self.h
-        f1 = lambda R: -2*R + 1.5 * R**2
-        f2 = lambda R: -0.5 * (2 - R)**2
+    def gradW(self, rij, rij_norm):
+        R = rij_norm/self.h
 
-        dWdr = (self.a_d / self.h) * np.piecewise(R, [(R>= 0) & (R<1), (R>=1) & (R<=2)], [f1,f2,0.0])
+        f1 = lambda R: (-2 + 1.5*R) * (rij / self.h**2)
+        f2 = lambda R: -0.5*(2 - R)**2 * rij / (rij_norm * self.h)
 
-        # check diags not nan
-        gradW = dWdr * np.sign(dx)
+        gradW = self.a_d * np.piecewise(R, [(R>= 0) & (R<1), (R>=1) & (R<=2)], [f1,f2,0.0])
+        
+        # protect against nan where |r_i - r_j| = 0 (diagonal)
+        np.fill_diagonal(gradW, 0.0)
 
         return gradW
-    
-
-# # NS operator
-# class NavierStokes1D:
-
-#     def __init__(self, alpha = 1.0, beta = 1.0):
-#         self.alpha = alpha  # for visc
-#         self.beta = beta
 
 
-#     def artificial_visc(self, system):
-#         dx, r = system.geom()
-        
-#         vij = system.v[:,None] - system.v[None,:] # v_ij = v_i - v_j
-#         xij = dx                             # x_ij = x_i - x_j (already calculated in geom())
-#         varphi = 0.1 * system.kernel.h
-
-#         phi_ij = system.kernel.h * vij * xij / (r**2 + varphi**2) # r = |x_ij| (geom())
-
-#         c = system.sound_speed()
-#         cij_bar = 0.5 * (c[:,None] + c[None,:])
-
-#         rhoij_bar = 0.5 * (system.rho[:,None] + system.rho[None,:])
-
-#         Pi_ij = (-self.alpha * cij_bar * phi_ij + self.beta * phi_ij**2) / rhoij_bar
-
-#         # mask the viscosity according condition vij * xij >=0 (theory)
-#         vij_dot_xij = xij*vij
-#         Pi_ij[vij_dot_xij >= 0] = 0.0
-
-#         return Pi_ij
-
-#     def momentum_equation(self, system):
-#         dx, r = system.geom()
-
-#         # collect kernel gradient and pressure vector
-#         gradW = system.kernel.gradW(dx, r)
-#         P = system.pressure()
-
-#         # viscosity
-#         Pi_ij = self.artificial_visc(system)
-
-#         # term in parenthesis in momentum equation
-#         parenthesis = (P[:,None] / system.rho[:,None]**2 # P_i/rho_i²
-#                       +P[None,:] / system.rho[None,:]**2 # P_j/rho_j²
-#                       +Pi_ij)
-        
-#         dvdt = -np.sum(system.m[None,:] # m_j
-#                      * parenthesis * gradW, axis=1) # axis = 1 -> (N,)
-        
-#         return dvdt
-
-#     def energy_equation(self, system):
-#         dx, r = system.geom()
-
-#         gradW = system.kernel.gradW(dx, r)
-#         P = system.pressure()
-
-#         # viscosity 
-#         Pi_ij = self.artificial_visc(system)
-
-#         vij = system.v[:,None] - system.v[None,:]
-        
-#         parenthesis = (P[:,None] / system.rho[:,None]**2 # P_i/rho_i²
-#                      + P[None,:] / system.rho[None,:]**2 # P_j/rho_j²
-#                      + Pi_ij)
 
 
-#         dedt = (1/2) * np.sum(system.m[None,:] # m_j
-#                             * parenthesis * vij * gradW, axis = 1) 
-        
-#         return dedt
-    
+dim = 3
+kernel = cubicSplineKernel(dim, h=1.0)
+sys = SPHsystem(3,dim,kernel)
 
-# # (put into Solver class eventually)
-# def RHS(t, S_flat, system, NSequations):
-#     """
-#     RHS of the ODE:
 
-#     f(y,t) = dy/dt
 
-#     dy/dt is dS/dt = [\dot{x}, \dot{v}, \dot{rho}, \dot{e}]
+x = np.array([0,2,4])
+y = np.array([0,3,1])
+z = np.array([0,0,0])
 
-#     Computes dS/dt given the current flattedned state vector
-#     RHS required by scipy.solve_ivp 
-#     """
+r = np.column_stack((x,y,z))    # -> one particle at (x,y) = (0,0), one at (2,3) and one at (4,1)
+sys.S[:,:dim] = r
 
-#     # rebuild the State vector (matrix) as the (N,4) shape
-#     S = S_flat.reshape(system.N, 4) 
-#     system.S[:] = S # update object
+print(sys.S)
 
-#     # update density (summation, not continuity)
-#     system.density_summation()
+x = np.linspace(-2, 5,100)
+y = np.linspace(-2, 5,100)
+X, Y = np.meshgrid(x, y)
+Z = np.zeros_like(X)
+Wtot = np.zeros_like(X)
 
-#     # compute time derivatives
-#     dxdt = system.v
-#     dvdt = NSequations.momentum_equation(system)
-#     dedt = NSequations.energy_equation(system)
+for r_i in r:
+    dx = X - r_i[0]
+    dy = Y - r_i[1]
+    dz = Z - r_i[2]
+    R  = np.sqrt(dx**2 + dy**2 + dz**2)
+    Wtot += kernel.W(R)
 
-#     dSdt = np.column_stack((dxdt,
-#                             dvdt,
-#                             np.zeros(system.N), # index [2] == rho[:] not updated, recomputed
-#                             dedt)) # obs order has to match S index convention
-    
-#     return dSdt.flatten()
+
+fig = plt.figure()
+ax = fig.add_subplot(111, projection='3d')
+ax.plot_surface(X, Y, Wtot, cmap="viridis")
+ax.set_xlabel("x")
+ax.set_ylabel("y")
+plt.show()
+
 
 
