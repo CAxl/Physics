@@ -101,13 +101,27 @@ import threeD
 
 
 
+# # two planet test
+# kernel = threeD.cubicSplineKernel(3,h=1e7)
+# system = threeD.SPHsystem(2,3,kernel)
+
+# system.S[0,:3] = [-1,0,0]
+# system.S[1,:3] = [ 1,0,0]
+
+# system.m = np.array([1,1])
+
+# NS = threeD.NSequations(selfgrav_flag=True)
+
+# print("NS.selfgrav(sys) = ", NS.selfgravity(system))
+
+
 
 # ======================== Planet collision =====================
 
 # ========================= read .dat file ======================
 
 data = np.loadtxt("Planet300.dat")
-print(data.shape)
+#print(data.shape)
 
 x = data[:,0]
 y = data[:,1]
@@ -126,9 +140,9 @@ P = data[:, 8]
 
 dim = 3
 N = data.shape[0]
-print(N) # 301 planets lmao
+#print(N) # 301 planets lmao
 
-kernel = threeD.cubicSplineKernel(dim, h = 10e7)
+kernel = threeD.cubicSplineKernel(dim, h = 1e8)
 system = threeD.SPHsystem(N, dim, kernel)
 
 gamma = system.gamma
@@ -136,11 +150,13 @@ gamma = system.gamma
 system.S[:,0:3] = r
 system.S[:,3:6] = v
 system.S[:,-2] = rho
-system.S[:,-1] = P / ((gamma - 1) * rho) # (??)
+system.S[:,-1] = P / ((gamma - 1) * rho) # (e ??)
+system.m = m    
 
+print(system.S)
 
-# give random velocities (no self gravity yet)
-#system.S[:,3:6] += 1e4 * np.random.randn(N,3)
+# #give random velocities (no self gravity yet)
+# system.S[:,3:6] += 1e4 * np.random.randn(N,3)
 
 
 # ==================== solver =========================
@@ -154,7 +170,7 @@ print(times[-1])
 
 
 S0 = system.S.flatten()
-NS = threeD.NSequations()
+NS = threeD.NSequations(selfgrav_flag=True)
 
 
 sol = solve_ivp(
@@ -169,65 +185,65 @@ sol = solve_ivp(
 )
 
 
-# debugging static plot 
-S_initial = sol.y[:,0].reshape(N, 2*dim+2)
-S_final   = sol.y[:,-1].reshape(N, 2*dim+2)
+# # debugging static plot 
+# S_initial = sol.y[:,0].reshape(N, 2*dim+2)
+# S_final   = sol.y[:,-1].reshape(N, 2*dim+2)
 
-disp = np.linalg.norm(S_final[:,0:3] - S_initial[:,0:3], axis=1)
+# disp = np.linalg.norm(S_final[:,0:3] - S_initial[:,0:3], axis=1)
 
-print("Max displacement:", np.max(disp))    # displacement smaller than radii when dt =0.01 N=100
+# print("Max displacement:", np.max(disp))    # displacement smaller than radii when dt =0.01 N=100
 
-# debugging error message: Ivalid value in np.sqrt((self.gamma - 1) * self.e)
-print("Min energy:", np.min(S_final[:, -1]))
-
-
-
+# # debugging error message: Ivalid value in np.sqrt((self.gamma - 1) * self.e)
+# print("Min energy:", np.min(S_final[:, -1]))
+# # using dt = 20, Nsteps = 300 I get massively negative self energies (Min energy: -12938018.008582849)
 
 
 
-# # ================ plotting 3D ==========================
-
-# fig = plt.figure(figsize=(8,8))
-# ax = fig.add_subplot(projection='3d')
-
-# # initial state from solver
-# S_init = sol.y[:,0].reshape(N, 2*dim + 2)
-# sc = ax.scatter(S_init[:,0], S_init[:,1], S_init[:,2], s=5)
-
-# # optional: fix axes so they don’t rescale every frame
-# lim = 1.2 * np.max(np.abs(S_init[:,0:3]))
-# ax.set_xlim(-lim, lim)
-# ax.set_ylim(-lim, lim)
-# ax.set_zlim(-lim, lim)
-
-# ax.set_xlabel("x")
-# ax.set_ylabel("y")
-# ax.set_zlabel("z")
 
 
-# # ------- update function ----------
-# def update(frame):
-#     S = sol.y[:,frame].reshape(N, 2*dim + 2)
-#     x = S[:,0]
-#     y = S[:,1]
-#     z = S[:,2]
+# ================ plotting 3D ==========================
 
-#     sc._offsets3d = (x, y, z)
-#     ax.set_title(f"t = {sol.t[frame]:.3f}")
-#     return sc,
+fig = plt.figure(figsize=(8,8))
+ax = fig.add_subplot(projection='3d')
+
+# initial state from solver
+S_init = sol.y[:,0].reshape(N, 2*dim + 2)
+sc = ax.scatter(S_init[:,0], S_init[:,1], S_init[:,2], s=5)
+
+# optional: fix axes so they don’t rescale every frame
+lim = 1.2 * np.max(np.abs(S_init[:,0:3]))
+ax.set_xlim(-lim, lim)
+ax.set_ylim(-lim, lim)
+ax.set_zlim(-lim, lim)
+
+ax.set_xlabel("x")
+ax.set_ylabel("y")
+ax.set_zlabel("z")
 
 
-# # ---------- animation ----------
-# ani = FuncAnimation(
-#     fig,
-#     update,
-#     frames=len(sol.t),
-#     interval=50,
-#     blit=False
-# )
+# ------- update function ----------
+def update(frame):
+    S = sol.y[:,frame].reshape(N, 2*dim + 2)
+    x = S[:,0]
+    y = S[:,1]
+    z = S[:,2]
 
-# writer = FFMpegWriter(fps=30)
-# ani.save("./results/planet300.mp4", writer=writer)
+    sc._offsets3d = (x, y, z)
+    ax.set_title(f"t = {sol.t[frame]:.3f}")
+    return sc,
+
+
+# ---------- animation ----------
+ani = FuncAnimation(
+    fig,
+    update,
+    frames=len(sol.t),
+    interval=50,
+    blit=False
+)
+
+writer = FFMpegWriter(fps=30)
+ani.save("./results/planet300_with_gravity.mp4", writer=writer)
 
 
 

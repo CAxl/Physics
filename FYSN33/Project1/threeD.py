@@ -108,9 +108,10 @@ class cubicSplineKernel:
         return gradW
     
 class NSequations:
-    def __init__(self, alpha = 1.0, beta = 1.0):
+    def __init__(self, alpha = 1.0, beta = 1.0, selfgrav_flag = False):
         self.alpha = alpha
         self.beta = beta
+        self.selfgrav_flag = selfgrav_flag
 
     def artifical_visc(self, system):
         rij, rij_norm = system.geom()
@@ -142,6 +143,45 @@ class NSequations:
 
         return Pi_ij
     
+    def selfgravity(self, system, G = 6.6743*1e-9):
+        rij, rij_norm = system.geom()   # (N,N,dim), (N,N)
+        h = system.kernel.h
+
+        R = rij_norm / h
+
+        # preallocate dphidr shape == (N,N)
+        dphidr = np.zeros_like(rij_norm)
+
+        # piecewise derivative dphi/dr
+        mask1 = (R >= 0) & (R < 1)
+        mask2 = (1 <= R) & (R < 2)
+        mask3 = (R >= 2)
+
+        # 0 <= R < 1
+        dphidr[mask1] = (1/h**2) * ((4/3)*R[mask1] - (6/5)*R[mask1]**3 + (1/2)*R[mask1]**4)
+        
+        # 1 <= R < 2
+        dphidr[mask2] = (1/h**2) * ((8/3)*R[mask2] - 3*R[mask2]**2 + (6/5)*R[mask2]**3 - (1/6)*R[mask2]**4 - 1/(15*R[mask2]**2))
+
+        # R >= 2
+        dphidr[mask3] = 1 / (rij_norm[mask3]**2) # computationally heavy part (eliminates zeros)
+
+        # remove diagonal self-interaction terms
+        np.fill_diagonal(dphidr, 0.0)
+
+        
+        # calculate gradient grad_iphi_ij:
+        eps = 1e-12
+        inv_r = 1.0 / (rij_norm + eps)  # avoid div zero
+        gradphi_ij = dphidr[:,:,None] * rij * inv_r[:,:,None]
+
+        # sum over j (axis1)
+        dvdt_grav = - G * np.sum(system.m[None,:,None] * gradphi_ij, axis = 1)
+
+        return dvdt_grav
+
+
+
     def momentum_equation(self,system):
         rij, rij_norm = system.geom()
 
@@ -164,6 +204,10 @@ class NSequations:
         # \sum_j m_j(...)\nabla_iW_ij -> axis = 1 == j
 
         dvdt = -np.sum(system.m[None,:,None] * parenthesis[:,:,None] * gradW, axis=1) #[i,j,k] sum over j (axis 1)
+
+        # add gravity if true
+        if self.selfgrav_flag:
+            dvdt = dvdt + self.selfgravity(system)
 
         return dvdt # (N,dim)
 
