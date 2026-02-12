@@ -84,7 +84,7 @@ class cubicSplineKernel:
         return self.a_d * np.piecewise(R, [(R>= 0) & (R<1), (R>=1) & (R<=2)], [f1,f2,0.0])
 
     def gradW(self, dx, r):
-
+        
         R = np.abs(r)/self.h
         f1 = lambda R: -2*R + 1.5 * R**2
         f2 = lambda R: -0.5 * (2 - R)**2

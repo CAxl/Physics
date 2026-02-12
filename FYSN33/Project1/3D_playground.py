@@ -1,6 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.integrate import solve_ivp
+from matplotlib.animation import FuncAnimation, FFMpegWriter
 
 import threeD
 
@@ -138,15 +139,18 @@ system.S[:,-2] = rho
 system.S[:,-1] = P / ((gamma - 1) * rho) # (??)
 
 
+# give random velocities (no self gravity yet)
+#system.S[:,3:6] += 1e4 * np.random.randn(N,3)
+
 
 # ==================== solver =========================
 
 t0 = 0.0
-dt = 0.01
-Nsteps = 100
+dt = 20
+Nsteps = 300
 
 times = np.linspace(0,dt*Nsteps,Nsteps)
-print(times)
+print(times[-1])
 
 
 S0 = system.S.flatten()
@@ -165,21 +169,66 @@ sol = solve_ivp(
 )
 
 
-fig, ax = plt.figure(figsize=(12,12),dpi=400,fps=30)
-sc = ax.scatter(system.S[:,0], system.S[:,1], system.S[:,2])
+# debugging static plot 
+S_initial = sol.y[:,0].reshape(N, 2*dim+2)
+S_final   = sol.y[:,-1].reshape(N, 2*dim+2)
 
-def update(frame):
-    sc.set_offsets(np.c_[x])
+disp = np.linalg.norm(S_final[:,0:3] - S_initial[:,0:3], axis=1)
+
+print("Max displacement:", np.max(disp))    # displacement smaller than radii when dt =0.01 N=100
+
+# debugging error message: Ivalid value in np.sqrt((self.gamma - 1) * self.e)
+print("Min energy:", np.min(S_final[:, -1]))
 
 
 
 
-fig = plt.figure(figsize=(12, 12))
-ax = fig.add_subplot(projection='3d')
 
 
-ax.scatter(x,y,z)
-plt.show()
+# # ================ plotting 3D ==========================
+
+# fig = plt.figure(figsize=(8,8))
+# ax = fig.add_subplot(projection='3d')
+
+# # initial state from solver
+# S_init = sol.y[:,0].reshape(N, 2*dim + 2)
+# sc = ax.scatter(S_init[:,0], S_init[:,1], S_init[:,2], s=5)
+
+# # optional: fix axes so they don’t rescale every frame
+# lim = 1.2 * np.max(np.abs(S_init[:,0:3]))
+# ax.set_xlim(-lim, lim)
+# ax.set_ylim(-lim, lim)
+# ax.set_zlim(-lim, lim)
+
+# ax.set_xlabel("x")
+# ax.set_ylabel("y")
+# ax.set_zlabel("z")
+
+
+# # ------- update function ----------
+# def update(frame):
+#     S = sol.y[:,frame].reshape(N, 2*dim + 2)
+#     x = S[:,0]
+#     y = S[:,1]
+#     z = S[:,2]
+
+#     sc._offsets3d = (x, y, z)
+#     ax.set_title(f"t = {sol.t[frame]:.3f}")
+#     return sc,
+
+
+# # ---------- animation ----------
+# ani = FuncAnimation(
+#     fig,
+#     update,
+#     frames=len(sol.t),
+#     interval=50,
+#     blit=False
+# )
+
+# writer = FFMpegWriter(fps=30)
+# ani.save("./results/planet300.mp4", writer=writer)
+
 
 
 
