@@ -143,7 +143,7 @@ class NSequations:
 
         return Pi_ij
     
-    def selfgravity(self, system, G = 6.6743*1e-9):
+    def selfgravity(self, system, G = 6.6743*1e-11):
         rij, rij_norm = system.geom()   # (N,N,dim), (N,N)
         h = system.kernel.h
 
@@ -265,6 +265,33 @@ def RHS(t, S_flat, system, NSequations):
 
     return dSdt.flatten()
 
+
+
+def add_spin(system, indices, T):
+    """
+    adds rigid body rotation around z-axis
+    to the particles specified by `indices`.
+    """
+
+    omega_z = 2*np.pi / T
+    omega = np.array([0.0, 0.0, omega_z])
+
+    # select subset
+    r = system.r[indices]
+    m = system.m[indices]
+
+    # center of mass of this subset
+    Mtot = np.sum(m)
+    r_com = np.sum(m[:,None] * r, axis=0) / Mtot
+
+    # relative positions
+    r_rel = r - r_com
+
+    # rigid rotation velocity
+    v_rot = np.cross(omega, r_rel)
+
+    # add to state vector
+    system.S[indices, 3:6] += v_rot
 
 
 
