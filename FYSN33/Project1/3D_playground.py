@@ -343,7 +343,7 @@ ani = FuncAnimation(
 )
 
 writer = FFMpegWriter(fps=30)
-ani.save("./results/planet300_collision_test.mp4", writer=writer)
+ani.save("./results/planet300_testing.mp4", writer=writer)
 
 
 

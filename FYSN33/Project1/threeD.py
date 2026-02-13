@@ -267,10 +267,11 @@ def RHS(t, S_flat, system, NSequations):
 
 
 
+# hard-coded for dim == 3 (for now)
 def add_spin(system, indices, T):
     """
     adds rigid body rotation around z-axis
-    to the particles specified by `indices`.
+    to the particles specified by [indices].
     """
 
     omega_z = 2*np.pi / T
@@ -287,154 +288,9 @@ def add_spin(system, indices, T):
     # relative positions
     r_rel = r - r_com
 
-    # rigid rotation velocity
+    # rotation velocity
     v_rot = np.cross(omega, r_rel)
 
-    # add to state vector
+    # add to state vector (v's)
     system.S[indices, 3:6] += v_rot
-
-
-
-# dim = 3
-# kernel = cubicSplineKernel(dim, h=1.0)
-# sys = SPHsystem(3,dim,kernel)
-
-# rij, rij_norm  = sys.geom()
-
-# x = np.array([0,2,4])
-# y = np.array([0,3,1])
-# z = np.array([0,0,0])
-
-# r = np.column_stack((x,y,z))    # -> one particle at (x,y) = (0,0), one at (2,3) and one at (4,1)
-# sys.S[:,:dim] = r
-
-
-# print(r[0])
-# print(r[1])
-# print(r[2])
-
-
-
-# 3D plotting
-
-# x = np.linspace(-2, 5,100)
-# y = np.linspace(-2, 5,100)
-# X, Y = np.meshgrid(x, y)
-# Z = np.zeros_like(X)
-# Wtot = np.zeros_like(X)
-
-# for r_i in r:
-#     dx = X - r_i[0]
-#     dy = Y - r_i[1]
-#     dz = Z - r_i[2]
-#     R  = np.sqrt(dx**2 + dy**2 + dz**2)
-#     Wtot += kernel.W(R)
-
-
-# fig = plt.figure()
-# ax = fig.add_subplot(111, projection='3d')
-# ax.plot_surface(X, Y, Wtot, cmap="viridis")
-# ax.set_xlabel("x")
-# ax.set_ylabel("y")
-# plt.show()
-
-
-
-# ================ testing gradW ==============
-
-# # 1D
-# N = 100
-# dim = 1
-# kernel = cubicSplineKernel(dim, h=1.0)
-# sys = SPHsystem(N, dim, kernel)
-
-# print(sys.S)
-
-# sys.S[:,0] = np.linspace(0,10,N)
-
-# plt.imshow(sys.S)
-# #plt.show()
-
-# r = sys.r
-# print(r.shape)
-# x = r[:,0]
-
-# rij, rij_norm = sys.geom()
-# dw = kernel.gradW(rij, rij_norm)
-
-# # w = kernel.W(rij_norm)
-# # plt.imshow(w)
-# # plt.colorbar()
-# # plt.show()
-
-# plt.imshow(dw)
-# plt.colorbar()
-# plt.show()
-
-
-# print(dw.shape)
-# print(dw)
-
-
-# #3D
-# N = 100
-# dim = 3
-# kernel = cubicSplineKernel(dim,h=1.0)
-# system = SPHsystem(N,dim,kernel)
-
-# r = np.column_stack((np.linspace(0,10,N), np.linspace(0,10,N), np.linspace(0,10,N)))
-
-# system.S[:,:dim] = r
-
-# print(system.S)
-# plt.imshow(system.S)
-# plt.show()
-
-# rij, rij_norm = system.geom()
-# print(rij.shape)
-# print(rij_norm.shape)
-
-# print(rij_norm)
-# W = kernel.W(rij_norm)
-# print(W.shape)
-
-# plt.imshow(W)
-# plt.show()
-
-# dw = kernel.gradW(rij, rij_norm)
-# print(dw.shape)
-
-
-# # test slicing
-# N = 3
-# dim = 3
-# kernel = cubicSplineKernel(dim,h=1.0)
-# sys = SPHsystem(N,dim,kernel)
-
-# vx = np.array([1,2,3])
-# vy = np.array([5,4,3])
-# vz = np.array([0,0,0])
-
-# v_vec = np.column_stack((vx,vy,vz))
-# sys.S[:,dim:2*dim] = v_vec
-
-
-# print("vx particle 0 = ", sys.v[0][0])
-# print("vx particle 1 = ", sys.v[1][0])
-# print("vx particle 2 = ", sys.v[2][0])
-
-# print("vy particle 0 = ", sys.v[0][1])
-
-# #print(sys.S)
-
-# # v[i][j][0] v_xi - v_xj
-# # v[i][j][1] v_yi - v_yj
-# vij = sys.v[:,np.newaxis,:] - sys.v[np.newaxis,:,:]
-
-
-
-# print("v_x0 - v_x1 = ", vij[0,1,0])
-
-
-
 
