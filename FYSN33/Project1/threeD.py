@@ -37,12 +37,10 @@ class SPHsystem:
 
     def geom(self):
         """
-        Think of every property as indexed [i,j,k]
+        Index convention: [i,j,k]
         i = particle index treated
         j = neighbouring particle j \in {0,N}
         k = x,y,z
-
-        (in test case this looks correct)
         """
         ri = self.r[:,None,:] # ri[i,0,:] = ri
         rj = self.r[None,:,:] # rj[0,j,:] = rj

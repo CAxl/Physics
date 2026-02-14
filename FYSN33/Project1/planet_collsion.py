@@ -18,9 +18,11 @@ data2 = np.copy(data)
 # --------------- set separation ----------------
 
 R_body1 = np.max(np.linalg.norm(data[:,0:3], axis=1)) # max diamter of planet1
+print("size of planet 1 = ", R_body1)
 
-initial_separation = 4 * R_body1 # separation of the two planets
+initial_separation = 5 * R_body1 # separation of the two planets
 data2[:,0] += initial_separation # separate planet two's x-coords
+data2[:,1] += R_body1 / 2 # make them not collide literally exactly head on (set planet2 y += fraction of R_body1)
 
 
 # --------------- initial velocity ---------------
@@ -29,10 +31,11 @@ G = 6.6743e-11
 M_total = np.sum(data[:,6])
 
 v_impact = np.sqrt(2 * G * M_total / initial_separation)
+print("impact velocity = ", v_impact)
 
 # give initial and opposite v_x for both planets
-data[:,3] += v_impact / 2
-data2[:,3] += -v_impact / 2
+data[:,3] += 1.5 * v_impact
+data2[:,3] += -2.5 * v_impact
 
 
 # =================== build SPHsystem (combined state vector) =======================
@@ -63,6 +66,99 @@ system.S[:,-1] = P / ((gamma - 1) * rho) # (e ??)
 system.m = m 
 
 
+# ---------- add spin to both planets ----------------
+N_half = system.N // 2
+
+T_spin = 4*1e3
+T_spin2 = 8.5*1e3
+
+threeD.add_spin(system, np.arange(0, N_half), T_spin)
+threeD.add_spin(system, np.arange(N_half, system.N), T_spin2)
+
+
+
+# ===================== solver =====================
+
+"""
+_______________________________
+collision 0:
+-----------------------
+G = 6.6743*1e-11
+h = 5*1e6
+Nsteps = 2000
+dt = 10
+=> t[-1] = 20000
+
+(No spin)
+
+initial velocity +- v_impact/2 
+(a bit too slow)
+
+separeted 4*R_body1 in x only
+_______________________________
+collision 1:
+-----------------------
+G = 6.6743*1e-11
+h = 5*1e6
+Nsteps = 2000
+dt = 10
+=>t[-1] = 20000
+
+T_spin = 8.5*1e3 (both)
+
+initial velocity +- v_impact
+
+separeted 3*R_body1 in x
+R_body1 / 3 in y
+_______________________________
+
+collision 2:
+-----------------------
+G = 6.6743*1e-11
+h = 5*1e6
+Nsteps = 2000
+dt = 10
+=>t[-1] = 20000
+
+T_spin = 1e3 planet1
+T_spin = 1e2 planet2
+
+initial velocity + 2 * v_impact (planet 1)
+                 - 4 * v_impact (planet 2)
+
+separeted 5*R_body1 in x
+R_body1 / 2 in y
+
+runtime warning: invalid value encoutered in sqrt (negative self energies)
+
+wayyy to large spin lmao, palnets break before colliding
+_______________________________
+
+
+collision 3:
+-----------------------
+G = 6.6743*1e-11
+h = 5*1e6
+Nsteps = 2000
+dt = 10
+=>t[-1] = 20000
+
+T_spin = 4e3 planet1
+T_spin = 8.5e2 planet2
+
+initial velocity + 1.5 * v_impact (planet 1)
+                 - 2.5 * v_impact (planet 2)
+
+separeted 5*R_body1 in x
+R_body1 / 2 in y
+
+
+
+
+_______________________________
+
+
+"""
 
 t0 = 0.0
 dt = 10
@@ -86,23 +182,6 @@ sol = solve_ivp(
     rtol=1e-4,
     atol=1e-7
 )
-
-
-# # debugging static plot 
-# S_initial = sol.y[:,0].reshape(N, 2*dim+2)
-# S_final   = sol.y[:,-1].reshape(N, 2*dim+2)
-
-# disp = np.linalg.norm(S_final[:,0:3] - S_initial[:,0:3], axis=1)
-
-# print("Max displacement:", np.max(disp))    # displacement smaller than radii when dt =0.01 N=100
-
-# # debugging error message: Ivalid value in np.sqrt((self.gamma - 1) * self.e)
-# print("Min energy:", np.min(S_final[:, -1]))
-# # using dt = 20, Nsteps = 300 I get massively negative self energies (Min energy: -12938018.008582849)
-
-
-
-
 
 # ================ plotting 3D ==========================
 
@@ -173,7 +252,7 @@ ani = FuncAnimation(
 )
 
 writer = FFMpegWriter(fps=30)
-ani.save("./results/planet300_collision_test.mp4", writer=writer)
+ani.save("./results/planet300_collision3.mp4", writer=writer)
 
 
 

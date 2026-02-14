@@ -100,22 +100,6 @@ import threeD
 # plt.show()
 
 
-
-# # two planet test
-# kernel = threeD.cubicSplineKernel(3,h=1e7)
-# system = threeD.SPHsystem(2,3,kernel)
-
-# system.S[0,:3] = [-1,0,0]
-# system.S[1,:3] = [ 1,0,0]
-
-# system.m = np.array([1,1])
-
-# NS = threeD.NSequations(selfgrav_flag=True)
-
-# print("NS.selfgrav(sys) = ", NS.selfgravity(system))
-
-
-
 # ======================== Planet collision =====================
 
 # ========================= read .dat file ======================
@@ -133,14 +117,10 @@ m = data[:, 6]
 rho = data[:, 7]
 P = data[:, 8]
 
-# print(r)
-# print(P)
-
 # ======================= SPH system setup =================
 
 dim = 3
-N = data.shape[0]
-#print(N) # 301 planets lmao
+N = data.shape[0] # 301
 
 kernel = threeD.cubicSplineKernel(dim, h = 5*1e6)
 system = threeD.SPHsystem(N, dim, kernel)
@@ -156,9 +136,6 @@ system.m = m
 # ------------- add spin --------------
 T_spin = 8.5e3
 threeD.add_spin(system, np.arange(system.N), T_spin)
-
-# #give random velocities (no self gravity yet)
-# system.S[:,3:6] += 1e4 * np.random.randn(N,3)
 
 
 # ==================== solver =========================
@@ -258,22 +235,6 @@ sol = solve_ivp(
 )
 
 
-# # debugging static plot 
-# S_initial = sol.y[:,0].reshape(N, 2*dim+2)
-# S_final   = sol.y[:,-1].reshape(N, 2*dim+2)
-
-# disp = np.linalg.norm(S_final[:,0:3] - S_initial[:,0:3], axis=1)
-
-# print("Max displacement:", np.max(disp))    # displacement smaller than radii when dt =0.01 N=100
-
-# # debugging error message: Ivalid value in np.sqrt((self.gamma - 1) * self.e)
-# print("Min energy:", np.min(S_final[:, -1]))
-# # using dt = 20, Nsteps = 300 I get massively negative self energies (Min energy: -12938018.008582849)
-
-
-
-
-
 # ================ plotting 3D ==========================
 
 fig = plt.figure(figsize=(8,8))
@@ -344,20 +305,6 @@ ani = FuncAnimation(
 
 writer = FFMpegWriter(fps=30)
 ani.save("./results/planet300_testing.mp4", writer=writer)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
