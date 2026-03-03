@@ -1,0 +1,239 @@
+\documentclass[11pt]{article}
+\usepackage[margin=2.5cm]{geometry}
+\usepackage{amsmath, amssymb}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{siunitx}
+\usepackage{enumitem}
+\usepackage{fancyhdr}
+\usepackage{booktabs}
+\usepackage{xcolor}
+\pagestyle{fancy}
+\fancyhf{}
+\lhead{Computational Physics – Project Brief}
+\rhead{Department of Physics, Lund University}
+\renewcommand{\headrulewidth}{0.4pt}
+
+\begin{document}
+
+\begin{center}
+  {\Large \textbf{Project: Neural-Network Tagger for Hadronic $V\!\to q\bar q$ Jets}}\\[6pt]
+  {\large ROC, purity, and applying a trained model to data}
+\end{center}
+
+\vspace{0.75em}
+
+\noindent\textbf{Summary.}
+You will build a small neural-network (NN) classifier to distinguish hadronically decaying electroweak bosons ($V=W/Z$) from generic QCD jets using a lepton\,+\,large-$R$ jet topology. You will:
+(i) train a tiny Multi-Layer Perceptron (MLP) on Monte Carlo (MC) truth-labeled jets, (ii) compare the performance of your MLP with a simple cut based selection using ROC and purity curves, and (iii) apply the trained model to data from the Large Hadron Collider to study the large-$R$ jet mass before/after selection.
+
+\textbf{The goal: }Imagine you work in an analysis group in the ATLAS experiment. Your boss wants you to measure the vector boson mass (a combination of the $W$ and $Z$ masses), and wants the mass peak to be as clean as possible. They have already tried a simple analysis, and now they want you to improve the performance with a neural network.
+
+This is an \textbf{applied} exercise: you will leverage standard libraries to \emph{use} NNs responsibly in a physics context. If you are curious about proofs and deeper theory, see e.g.\\ \url{http://neuralnetworksanddeeplearning.com/} by Nielsen.
+
+\medskip
+
+\noindent\textbf{Learning goals.}
+By the end you can:
+\begin{itemize}[leftmargin=1.5em]
+  \item Engineer basic input features to a neural network and understand what an NN \emph{sees}.
+  \item Train and validate a small MLP.
+  \item Quantify performance with ROC (TPR vs.\ FPR), AUC, and purity $S/(S{+}B)$.
+  \item Apply a trained model to data and interpret mass spectra changes.
+\end{itemize}
+
+\vspace{0.75em}
+\noindent\textbf{Data \& files provided.}
+All provided material can be found in the course gitlab.
+\begin{itemize}
+  \item \texttt{jets.csv} --- \emph{Data from the ATLAS experiment} (flattened): per-particle rows with columns. Each event consists of multiple rows that must be grouped by \texttt{event\_id}.\\
+  \small\texttt{\#event\_id, pid, pt [GeV], eta, phi, E [GeV], mass [GeV]}.\\
+  The data is taken from the CERN Open Data repository, see \url{https://opendata.atlas.cern/}.
+  \item \texttt{pythia.csv} --- \emph{MC} (generator-level truth available): same columns plus\\
+  \small\texttt{v\_true} $\in \{0,1\}$ for large-$R$ jets (1 if matched to a hadronic $V$).\\
+  The simulation is carried out with the PYTHIA Monte Carlo event generator, see \url{https://www.pythia.org/}.
+  \item \texttt{data-exercise-template.py} Template for the analysis, containing data classes and a cut-based analysis for you to use as a baseline.
+  \item \texttt{requirements.txt} A template file for setting up the neccesary Python environment.
+\end{itemize}
+The repo also contains the following auxiliary files (in the \texttt{extras}-folder) needed if one wanted to reproduce the data file and the simulation file from scratch. They are there for someone interested to get inspiration. They are not needed for you to complete the project, and you can thus safely ignore them unless you pick the related stretch goal:
+\begin{itemize}
+  \item \texttt{extras/main213.cc} PYTHIA program to generate the Monte Carlo truth file \texttt{pythia.csv}.
+  \item \texttt{extras/skimevents.py} The CERN Open Data is delivered in a more complicated format, which depends on the CERN ROOT (see \url{https://www.root.cern}) package. This program reads the relevant datafile and saves the data in the format of \texttt{jets.csv}.
+\end{itemize}
+
+\noindent\textbf{Physics summary of data and simulation files}
+Events contain at least one large-$R$ jet (anti-$k_T$, $R{=}1.0$, trimmed) and one charged lepton ($e$ or $\mu$). You should \emph{not} use jet mass or energy as NN inputs to avoid sculpting the mass spectrum; mass is used only for evaluation plots. You do not need to run a jet finding algorithm on data or MC, this has already been done.
+
+Each row in the data and MC files contains the following information:
+
+\begin{description}
+  \item[\texttt{event\_id}:] A unique identifier (integer) of each event. You can use this to split simulation between training and validation samples.
+  \item[\texttt{pid}:] Short for ``particle identification'', tells you what type of object is in this line. It is an integer equal to 90 for a jet, 11 for an electron and 13 for a muon, roughly following the standard convention of the field. You do not need to worry about this, if you use the \texttt{Particle} and \texttt{Event} classes provided in the template.
+  \item[\texttt{pt [GeV]}:] The particle or jet transverse momentum $p_T = \sqrt{p^2_x + p^2_y}$. In units of GeV.
+  \item[\texttt{eta}:] The particle or jet pseudorapidity $\eta = -\log\left(\tan(\theta/2)\right)$.
+  \item[\texttt{phi}:] The particle or jet azimuthal angle. In radians, typically in $[-\pi,\pi)$
+  \item[\texttt{E [GeV]}:] The particle or jet total energy. In units of GeV.
+  \item[\texttt{mass [GeV]}:] The particle or jet mass. In units of GeV.
+  \item[\texttt{v\_true}:] Truth information about the origin of the jet in Monte Carlo. It is 1 if the jet came from a vector boson, 0 otherwise.
+\end{description}
+
+\vspace{0.75em}
+\noindent\textbf{Reminder on ROC and purity measure} Let $y\in\{0,1\}$ denote the true label of the \emph{leading} large-$R$ jet (the leading jet is the one with the largest $p_T$) in an event ($1$ for $V\to q\bar q$-like, $0$ otherwise). For a selection (cuts or NN threshold) define:
+\[
+\text{purity} = \frac{S}{S+B}
+\]
+where $S$ ($B$) is the number of selected signal (background) jets among MC validation events, and $S_0$ ($B_0$) are totals before selection. Thus one can also compute a \emph{baseline purity} on the MC events before applying any cuts:
+\[
+\text{purity}_0 = \frac{S_0}{S_0+B_0}
+\]
+
+The ROC uses
+\[
+\text{TPR}=\varepsilon_S, \qquad \text{FPR}=\varepsilon_B,
+\]
+where:
+\[
+  \varepsilon_S \;=\; \frac{S}{S_0},\qquad
+  \varepsilon_B \;=\; \frac{B}{B_0},
+\]
+swept by varying a threshold $t$ on the NN score $\in(0,1)$.
+
+\section*{Tasks}
+
+\subsection*{A. Cut-based baseline (start here)}
+\begin{enumerate}[label=\textbf{A\arabic*.}]
+  \item \textbf{Study the cut-based selection.} You are supplied with a baseline in \texttt{data-exercise-template.py}. It implements a simple, physics-driven ``cut-based'' selection where the \emph{leading} large-$R$ jet $j$ and \emph{leading} lepton $\ell$ (remember: ``leading'' just means ``the one with the largest $p_T$''):
+  \[
+    p_T(\ell) \ge \SI{50}{GeV},\qquad p_T(j) \ge \SI{250}{GeV},\qquad \Delta\phi(j,\ell) \ge 2.4.
+  \]
+  The goal of this task is to \textbf{do better than this baseline} in terms of purity and ROC using a neural network, and plot them against each other.
+  You may be tempted to try and optimize the baseline. This is possible, and you can in fact obtain a better purity from a cut-based analysis only. It is, however, recommended that you do not spend much time on that until you are well through the main tasks. If you choose to improve the baseline, keep the original cut-based analysis as the main baseline, and show how your update improves it.
+  \item \textbf{Evaluate on MC (truth known).} Report purity $S/(S{+}B)$ of the cut-based analysis and any improvements. Compare to the no-cuts purity $S_0/(S_0 + B_0)$. You may also study $\varepsilon_S$, $\varepsilon_B$.
+  \item \textbf{Apply to data (truth unknown).} Plot the large-$R$ jet mass distribution (leading jet) \emph{before} and \emph{after} the cuts, density-normalized (meaning: area = 1). Comment on the change in the $W/Z$ mass region.
+\end{enumerate}
+
+\subsection*{B. Train a tiny MLP}
+This is where your experience with the \texttt{two-moons.ipynb} example will come in handy. Instead of starting from an empty editor, start from the two moons example, and replace the two moons data set with the particle physics data set. Use the existing class-based structure from the cut-based baseline. You can then slowly extend the example. This is \textbf{much} easier than starting from scratch!
+
+\begin{enumerate}[label=\textbf{B\arabic*.}]
+  \item \textbf{Feature engineering.} For each event, build a feature vector \emph{without} mass or energy, consisting of for example (10D)
+  \begin{align*}
+  x = (&p_T^j,\ \eta^j,\ \phi^j,\ p_T^\ell,\ \eta^\ell,\ \phi^\ell,\ \Delta\phi(j,\ell),\ \Delta R(j,\ell),\\
+      &p_T^j/p_T^\ell,\ (p_T^j-p_T^\ell)/(p_T^j{+}p_T^\ell)).
+  \end{align*}
+  Before training, you should rescale each input feature so that it has mean 0 and standard deviation 1 on the training set. This is called \emph{standardizing} your features:
+  \[
+    x_\text{std} = \frac{x - \mu_\text{train}}{\sigma_\text{train}}.
+  \]
+  This ensures that all input variables are on comparable scales (for example, $p_T$ may be hundreds of GeV while $\eta$ is $\mathcal{O}(1)$), which helps the network train more stably and efficiently. Compute $\mu$ and $\sigma$ using only the training set, and apply the same transformation to the validation sample and to data.
+  \item \textbf{Split MC by event id.} In this project we use a two-way split: the validation set is used both for early stopping and final performance evaluation. Make disjoint training and validation (try 60/40) sets by grouping on \texttt{event\_id}. You have to \textbf{shuffle} your training samples to avoid overtraining on features from a specific physics process in the training sample (biases in mini-batch training). If you encounter problems with overtraining later on, this is often the step to return to. A possible strategy for bug fixing is to do a \textit{three-way-split} (60/20/20) instead of a two-way one, having a sample you only use for deciding when to end the training (see \textbf{Early stopping} below), and then a fresh validation sample. This is not required for the exercise, but may be useful for bug hunting.
+  \item \textbf{Network and loss.} Use a small MLP. You can start with one similar to the one we used in \texttt{two-moons.ipynb} and evolve to e.g.
+  \[
+    \text{Linear}(10\!\to\!32)\to\text{ReLU}\to\text{Dropout}(p=0.1)\to
+    \text{Linear}(32\!\to\!16)\to\text{ReLU}\to
+    \text{Linear}(16\!\to\!1),
+  \]
+  trained with binary cross-entropy on logits (\texttt{BCEWithLogitsLoss}). We have not introduced \texttt{Dropout} in the lectures. Look it up in the documentation and find out what it does. Why is it a good idea to apply it?
+  \item \textbf{Early stopping.} Monitor the loss on the validation sample -- why are we not monitoring loss on the training sample directly? -- keep the best epoch. Report loss per epoch and discuss the curve.
+  \item \textbf{Test performance.} On the \emph{validation} split:
+    \begin{itemize}[noitemsep]
+      \item Plot histograms of scores for the background and signal samples respectively.
+      \item Plot the ROC (TPR vs.\ FPR) and quote AUC.
+      \item Plot \emph{purity vs threshold} $P(t)$ (precision curve). 
+      \item Choose a working point $(t^\star)$ by maximizing purity subject to $\varepsilon_S \ge 30\%$. Report your $t^\star$.
+      \item Compare to the numbers from the cut-based analysis. This is the point where you know if you did better. \textbf{Remember: }you can not tell whether your NN performs better on data, only on MC where truth is known.
+    \end{itemize}
+\end{enumerate}
+
+\subsection*{C. Apply the NN to data}
+\begin{enumerate}[label=\textbf{C\arabic*.}]
+  \item \textbf{Score data.} Apply the trained MLP to \texttt{jets.csv} to obtain a score per event (leading jet).
+  \item \textbf{Select.} Keep events with $s \ge t^\star$ and plot the leading large-$R$ jet mass \emph{before} and \emph{after} the NN selection on data (density-normalized).
+  \item \textbf{Compare with cuts.} On data, overlay three mass spectra: (i) all events, (ii) cut-based, (iii) NN ($t^\star$). On MC \emph{validation} split, print the purity for (ii) and (iii) for a direct comparison.
+  \item \textbf{Make a physics commentary.} What did we learn? What can we do better with this purified sample?
+  
+\end{enumerate}
+
+\section*{What to submit}
+Readable, documented code in a merge request to the exercise project. You should clearly describe your results and the methods used. It must at least include:
+\begin{itemize}
+      \item Code:
+      \begin{itemize}
+        \item Loading of csv file and feature building.
+        \item MLP training with a convergence criterion (eg. early stopping).
+        \item Code producing the ROC and purity curves.
+        \item Application of the selection to both data and MC.
+        \item Code producing the final mass plots.
+      \end{itemize}
+      \item Documentation. This can be delivered either as a pdf report or markdown documentation in your repository.
+      \begin{itemize}
+        \item A clear description of features, splits, and NN architecture.
+        \item ROC (with AUC) and purity-vs-threshold on the MC validation split.
+        \item The chosen working point $t^\star$ and the rationale (purity/efficiency trade-off).
+        \item Data plots: jet mass before/after cuts and NN; brief interpretation.
+        \item MC purity numbers for cut-based and NN selections.
+        \item Figure captions for all figures, explaining content and features.
+    \end{itemize}
+\end{itemize}
+Document also the environment requirements for running your code, eg. \texttt{numpy}, \texttt{torch}, \texttt{matplotlib}, ... with instructions on how to obtain them and run at least the first part of your code. The file \texttt{requirements.txt} can be reused and extended in your merge request.
+
+You are \emph{not} requested to provide mathematical proofs relating to NNs. This is an applied exercise.
+
+\section*{Finished early? Stretch goals}
+
+If you complete the core tasks ahead of time, pick one or more of the extensions below. Document what you changed and, if relevant, how it affected ROC, AUC, purity, and the data mass spectra.
+
+\subsection*{1. Extend the MC sample (physics, \texttt{C++})}
+Add \emph{one additional process} to the MC training sample using \texttt{extras/main213.cc} as a template. You will need a local PYTHIA8 + FastJet installation (see \url{https://www.pythia.org} and \url{https://www.fastjet.fr} for installation instructions).
+
+\begin{itemize}
+  \item \textbf{Suggested backgrounds:}
+    \begin{itemize}
+      \item QCD dijets (hard scattering): \verb|HardQCD:all = on| with \verb|PhaseSpace:pTHatMin = 150.| (rich non-$V$ jets).
+      \item Single top (Wt or t-channel): e.g.\ \verb|SingleTop:all = on| (leptons from $W$ in top decay can fake the topology).
+    \end{itemize}
+  \item \textbf{Hints:} The code in \texttt{extras/main213.cc} is already set up so you can easily add another subprocess. Reading that code and extending it will be much, much easier than writing your own, since it ensures that you reproduce the relevant jet selection etc..
+  \item \textbf{Deliverables:} regenerate \texttt{pythia.csv} (or a separate \texttt{pythia-extended.csv}), retrain the NN, and compare ROC/purity to the baseline sample.
+\end{itemize}
+
+\subsection*{2. Try a different neural network (ML)}
+Build a second classifier and compare against your baseline MLP.
+
+\begin{itemize}
+  \item \textbf{Change at least one of:}
+    \begin{itemize}
+      \item \textbf{Architecture:} deeper/wider MLP (e.g.\ $10\!\to\!64\!\to\!32\!\to\!1$), or remove a hidden layer.
+      \item \textbf{Activation:} replace ReLU with \texttt{Tanh}, \texttt{LeakyReLU}, or \texttt{GELU}.
+      \item \textbf{Loss:} use \texttt{BCELoss} with explicit sigmoid, or (for pedagogy) MSE on probabilities; discuss pros/cons vs \texttt{BCEWithLogitsLoss}.
+      \item \textbf{Optimizer:} try \texttt{SGD} with momentum or \texttt{AdamW}.
+    \end{itemize}
+  \item \textbf{Compare:} ROC (AUC), purity-vs-threshold, and chosen working point \(t^\star\). Comment on calibration (do scores look like probabilities?).
+\end{itemize}
+
+\subsection*{3. Add tests and continuous integration (software development, devops)}
+Propose and implement lightweight tests; run them in CI.
+
+\begin{itemize}
+  \item \textbf{Suggested tests:}
+    \begin{itemize}
+      \item \textbf{Determinism:} fixed seeds $\Rightarrow$ same split and same ROC/AUC on a small frozen subset.
+      \item \textbf{No leakage:} \texttt{event\_id} sets for train/val are disjoint.
+      \item \textbf{Features:} features never uses mass/energy; $\Delta\phi\in[0,\pi]$.
+      \item \textbf{Purity utility:} for a toy label/score vector, computed purity matches a hand calculation.
+      \item \textbf{ROC monotonicity:} FPR/TPR are non-decreasing when sweeping threshold.
+    \end{itemize}
+  \item Build a gitlab CI pipline by implementing an appropriate \texttt{gitlab-ci.yml}, document your tests and the results.
+\end{itemize}
+
+\subsection*{4. Accuracy vs.\ compute (sustainability, computing and society)}
+\begin{itemize}[leftmargin=1.2em]
+  \item \textbf{Measure runtime:} record wall–clock time for (i) one training epoch and total to early–stopping, (ii) inference per $10^5$ events, and (iii) the cut–based selection. If you can, also estimate energy used.
+  \item \textbf{Report accuracy:} on the same validation split, give AUC and purity $S/(S{+}B)$ at your $t^\star$ (and the cut–based purity). Optionally compute simple ``benefit per cost'': $\Delta\mathrm{AUC}/t_{\text{train}}$, $\Delta\text{purity}/t_{\text{train}}$ (or per Joule if measured).
+  \item \textbf{Short note (half a page):} discuss trade–offs of NN vs.\ cuts (performance, compute/energy, interpretability, maintenance). Say when the NN is ``worth it''. Propose two footprint mitigations (e.g. smaller model, stronger early stopping, pruning).
+\end{itemize}
+
+
+\begin{center}
+\textbf{Happy Hacking!}
+\end{center}
+\end{document}

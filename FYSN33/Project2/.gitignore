@@ -1,0 +1,9 @@
+# virtual environment
+.venv/
+
+# python cache
+__pycache__/
+*.pyc
+
+# took time to git add .
+datasets/
